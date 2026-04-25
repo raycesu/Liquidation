@@ -1,0 +1,71 @@
+import { redirect } from "next/navigation"
+import { TradingTerminal } from "@/components/trading-terminal"
+import { requireCurrentUser } from "@/lib/auth"
+import { getSql } from "@/lib/db"
+import type { Position, RoomParticipant } from "@/lib/types"
+
+export const dynamic = "force-dynamic"
+
+type TradePageProps = {
+  params: Promise<{
+    room_id: string
+  }>
+}
+
+export default async function TradePage({ params }: TradePageProps) {
+  const { room_id: roomId } = await params
+  const user = await requireCurrentUser()
+
+  if (!user) {
+    redirect("/sign-in")
+  }
+
+  const sql = getSql()
+  const participantRows = (await sql`
+    select
+      id::text,
+      room_id::text,
+      user_id,
+      available_margin::float8 as available_margin,
+      total_equity::float8 as total_equity,
+      created_at::text
+    from room_participants
+    where room_id = ${roomId}
+      and user_id = ${user.id}
+    limit 1
+  `) as RoomParticipant[]
+  const participant = participantRows[0]
+
+  if (!participant) {
+    redirect(`/join/${roomId}`)
+  }
+
+  const positions = (await sql`
+    select
+      id::text,
+      participant_id::text,
+      symbol,
+      side,
+      leverage,
+      size::float8 as size,
+      margin_allocated::float8 as margin_allocated,
+      entry_price::float8 as entry_price,
+      liquidation_price::float8 as liquidation_price,
+      is_open,
+      created_at::text,
+      closed_at::text
+    from positions
+    where participant_id = ${participant.id}
+      and is_open = true
+    order by created_at desc
+  `) as Position[]
+
+  return (
+    <TradingTerminal
+      roomId={roomId}
+      participantId={participant.id}
+      initialAvailableMargin={participant.available_margin}
+      initialPositions={positions}
+    />
+  )
+}

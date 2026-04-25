@@ -1,0 +1,201 @@
+# Liquidation — Cursor Rules
+# Paper-trading competition platform for crypto perpetual futures
+# Stack: Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui, Neon Postgres, Clerk
+
+## Project Identity
+- App name: Liquidation
+- Purpose: Simulated crypto perpetuals trading competitions with real-time price data
+- Design theme: Deep/Neon Blue trading terminal (Hyperliquid-inspired)
+- Cost constraint: 100% free-tier APIs — never suggest paid endpoints
+
+---
+
+## Architecture Rules
+
+### WebSocket (CRITICAL)
+- The Binance WebSocket `wss://stream.binance.com:9443/ws/!ticker@arr` MUST only be
+  used CLIENT-SIDE inside a `useEffect` hook in a `'use client'` component.
+- NEVER call any WebSocket from a Server Component, Server Action, or API route.
+  A server-side WebSocket would mean one IP hits Binance for all users and get banned.
+- The custom hook for this is `useBinanceTicker` in `/hooks/useBinanceTicker.ts`.
+  Always import live prices from this hook on the client.
+
+### Server Actions vs Client
+- Server Actions use the Binance REST endpoint for price fetches:
+  `https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT`
+- Client components use the `useBinanceTicker` WebSocket hook for live prices.
+- Never mix these up. REST on server, WebSocket on client.
+
+### Next.js App Router
+- Use the App Router exclusively. No `pages/` directory.
+- Co-locate Server Components and Client Components. Default to Server Components;
+  add `'use client'` only when hooks, state, or browser APIs are needed.
+- Use Server Actions (in `/actions/`) for all database mutations. No API routes
+  unless absolutely necessary.
+- Use `loading.tsx` and `error.tsx` in route segments.
+
+---
+
+## Database And Auth Rules (Neon + Clerk)
+
+### Schema Integrity
+- Never modify the core tables (`users`, `rooms`, `room_participants`, `positions`)
+  without updating the TypeScript types in `/lib/types.ts` at the same time.
+- Use Clerk user IDs (`text`) for `users.id`; use `uuid` for room, participant,
+  and position primary keys. Never use auto-increment integers.
+- All timestamps are `timestamptz` (timezone-aware), not plain `timestamp`.
+
+### Authorization
+- Clerk is the source of truth for authentication. Use `@clerk/nextjs/server`
+  in Server Components and Server Actions.
+- Database authorization must be enforced server-side in every query or mutation.
+  Users can only mutate their own participant rows and positions.
+- Leaderboard queries may read all participants in the current room after the
+  signed-in user is verified as a room participant.
+- Never expose `DATABASE_URL` or `CLERK_SECRET_KEY` to client components.
+
+### Queries
+- Always use the lazy Neon SQL client from `/lib/db.ts`.
+- Prefer explicit column lists over `select *` for performance and stable types.
+- Cast Postgres `numeric` values to `float8` in SELECT queries when returning
+  them to TypeScript UI code.
+- Surface database errors with human-readable messages. Never silently swallow errors.
+
+---
+
+## Perpetuals Engine Rules (NEVER change this math)
+
+### Margin Calculation
+```
+Required Margin = Size / Leverage
+```
+Always validate: `available_margin >= Required Margin` before writing a position.
+
+### Liquidation Prices (Maintenance Margin Rate = 0.005)
+```
+Long:  entry_price * (1 - (1 / leverage) + 0.005)
+Short: entry_price * (1 + (1 / leverage) - 0.005)
+```
+
+### PnL Calculation (client-side only, uses live WebSocket price)
+```
+Long PnL:  (livePrice - entryPrice) / entryPrice * size
+Short PnL: (entryPrice - livePrice) / entryPrice * size
+ROE%:      (unrealizedPnl / marginAllocated) * 100
+```
+
+### Closing a Position (Server Action)
+1. Fetch final price from Binance REST API (server-side).
+2. Calculate realized PnL.
+3. Floor PnL at `-margin_allocated` — never allow negative equity from a race condition.
+4. Set `is_open = false` on position.
+5. `available_margin += margin_allocated + realized_pnl`
+6. Recalculate and update `total_equity`.
+
+### Liquidation Check (Lazy Evaluation)
+On every leaderboard or room dashboard page load, call the liquidation sweep
+Server Action. It fetches current REST prices and liquidates any position where:
+- LONG: `live_price <= liquidation_price`
+- SHORT: `live_price >= liquidation_price`
+Liquidation PnL = `-margin_allocated` (total margin loss).
+
+---
+
+## UI & Design Rules
+
+### Color System — use CSS variables from globals.css
+```css
+--background: #050a14
+--surface: #0d1a2e
+--surface-elevated: #102240
+--border: #1a3a5c
+--accent-blue: #0094ff
+--accent-neon: #00d4ff
+--text-primary: #e8f4ff
+--text-secondary: #6b9ab8
+--green: #00c97a
+--red: #ff3b5c
+```
+Never hardcode hex colors inline. Always reference these variables.
+
+### PnL Color Convention
+- Positive PnL / Long button: `var(--green)` (#00c97a)
+- Negative PnL / Short button: `var(--red)` (#ff3b5c)
+- Apply via Tailwind custom classes or inline CSS variables. Never use Tailwind's
+  default `text-green-500` or `text-red-500` — they don't match the trading theme.
+
+### shadcn/ui
+- Use shadcn/ui components as the base for all UI elements (Button, Card, Dialog,
+  Slider, Input, Table, Tabs, Badge).
+- Customize via CSS variables, not by modifying shadcn source files directly.
+
+### lightweight-charts
+- The charting library is `lightweight-charts`. No other chart libraries for the
+  price chart. Use `createChart` from the library.
+- Always clean up the chart instance on component unmount to prevent memory leaks.
+- Historical data for the chart comes from Binance Klines API, fetched client-side.
+
+### Leverage Slider
+- Range: 1x to 20x. Step: 1. Default: 5x.
+- Always display the calculated Required Margin below the slider in real time.
+
+---
+
+## TypeScript Rules
+
+- Strict mode must remain enabled (`"strict": true` in tsconfig).
+- No `any` types. Use `unknown` and narrow with type guards if needed.
+- Define all database/domain types in `/lib/types.ts` and import from there.
+- All Server Actions must be explicitly typed with their return value.
+- The `position` object must always be typed as the full `Position` interface from
+  `/lib/types.ts` — never use ad-hoc inline types for DB records.
+
+---
+
+## File Structure — always place new files here
+
+```
+/app
+  /dashboard          → Authenticated home (room cards)
+  /room/[room_id]     → Room lobby + leaderboard
+  /room/[room_id]/trade → Trading terminal
+  /join/[room_id]     → Join flow
+/components           → Shared UI components
+/hooks                → Custom React hooks (useBinanceTicker, etc.)
+/actions              → Server Actions only (place_order, close_position, liquidate)
+/lib                  → db.ts, auth.ts, types.ts, binance.ts (REST helper), utils.ts
+```
+
+---
+
+## Patterns to Follow
+
+### Optimistic UI for Trade Placement
+After a user clicks Long/Short, optimistically add the position to local state
+immediately. Don't wait for the Server Action to resolve before showing it in the
+Open Positions table. Reconcile on server response.
+
+### Loading States
+Always show a loading skeleton for: leaderboard data, open positions table,
+chart historical data. Never show a blank screen while fetching.
+
+### Error Handling
+- Insufficient margin → show a clear inline error on the order form, not a toast.
+- All other Server Action errors → use a toast notification (shadcn/ui Toaster).
+- Database errors should be logged to the console and surfaced to the user with
+  a human-readable message. Never silently swallow errors.
+
+---
+
+## Patterns to Avoid
+
+- NO `pages/` directory — App Router only.
+- NO `getServerSideProps` or `getStaticProps` — these are Pages Router patterns.
+- NO Binance WebSocket connections in Server Components, Server Actions, or API routes.
+- NO direct database queries in Client Components — use Server Actions or
+  server-fetched props passed down as props.
+- NO `select *` in production queries — always select specific columns.
+- NO hardcoded prices or mock data in production code paths. Real prices only.
+- NO modifications to liquidation/PnL math without updating this rules file.
+- NO disabling TypeScript strict checks with `// @ts-ignore` or `// @ts-nocheck`.
+- NO use of `DATABASE_URL` or `CLERK_SECRET_KEY` on the client side.

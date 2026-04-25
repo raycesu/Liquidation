@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+coverage
+
+# Secret env files — never commit. Use .env.example for placeholders only
+.env
+.env.local
+.env*.local
+
+*.tsbuildinfo
