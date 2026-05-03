@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation"
+import Image from "next/image"
 import { CreateRoomDialog } from "@/components/create-room-dialog"
 import { RoomCard } from "@/components/room-card"
 import { SignOutButton } from "@/components/sign-out-button"
 import { requireCurrentUser } from "@/lib/auth"
+import { BRAND_LOGO_HEIGHT, BRAND_LOGO_SRC, BRAND_LOGO_WIDTH, BRAND_NAME } from "@/lib/brand"
 import { getSql } from "@/lib/db"
 import type { Room } from "@/lib/types"
 
@@ -50,8 +52,16 @@ export default async function DashboardPage() {
     <main className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.35em] text-accent-neon">Liquidation</p>
+          <div className="space-y-2">
+            <Image
+              src={BRAND_LOGO_SRC}
+              alt={`${BRAND_NAME} logo`}
+              width={BRAND_LOGO_WIDTH}
+              height={BRAND_LOGO_HEIGHT}
+              className="h-auto w-full max-w-md sm:max-w-lg md:max-w-xl"
+              priority
+              unoptimized
+            />
             <h1 className="mt-2 text-4xl font-semibold text-text-primary">Competition rooms</h1>
             <p className="mt-2 max-w-2xl text-text-secondary">
               Create crypto perpetuals rooms, invite competitors, and trade with virtual capital using live prices.
