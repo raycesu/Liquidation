@@ -1,5 +1,7 @@
+import Link from "next/link"
 import { redirect } from "next/navigation"
 import Image from "next/image"
+import { Button } from "@/components/ui/button"
 import { CreateRoomDialog } from "@/components/create-room-dialog"
 import { RoomCard } from "@/components/room-card"
 import { SignOutButton } from "@/components/sign-out-button"
@@ -67,7 +69,10 @@ export default async function DashboardPage() {
               Create crypto perpetuals rooms, invite competitors, and trade with virtual capital using live prices.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
+            <Button asChild variant="secondary">
+              <Link href="/dashboard/profile">Profile</Link>
+            </Button>
             <CreateRoomDialog />
             <SignOutButton />
           </div>

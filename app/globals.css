@@ -83,6 +83,39 @@
   --sidebar-ring: #00d4ff;
 }
 
+[data-theme="marketing-dark"] {
+  --background: #050a14;
+  --foreground: #e6f3ff;
+  --card: #0a1627;
+  --card-foreground: #e6f3ff;
+  --popover: #0a1627;
+  --popover-foreground: #e6f3ff;
+  --primary: #0f8dff;
+  --primary-foreground: #ecf7ff;
+  --secondary: #12253d;
+  --secondary-foreground: #d6e8fa;
+  --muted: #12253d;
+  --muted-foreground: #6e93b8;
+  --accent: #11bfff;
+  --accent-foreground: #021221;
+  --border: #223e63;
+  --input: #274669;
+  --ring: #11bfff;
+  --surface: #0b1a2d;
+  --surface-elevated: #10233a;
+  --accent-blue: #0f8dff;
+  --accent-neon: #10c7ff;
+  --text-primary: #e6f3ff;
+  --text-secondary: #87abcf;
+  --green: #0ac97d;
+  --red: #ff4d70;
+  --chart-1: #10c7ff;
+  --chart-2: #0f8dff;
+  --chart-3: #0ac97d;
+  --chart-4: #ff4d70;
+  --chart-5: #7ca2c5;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -26,7 +26,7 @@ type RootLayoutProps = Readonly<{
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <ClerkProvider>
-      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark`}>
+      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} scroll-smooth dark`}>
         <body>
           {children}
           <Toaster richColors theme="dark" />

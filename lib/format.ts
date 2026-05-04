@@ -14,3 +14,26 @@ export const formatPercent = (value: number) =>
   `${new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 2,
   }).format(value)}%`
+
+/** Compact USD-style label for large quote volumes (USDT ≈ USD). */
+export const formatCompactUsd = (value: number) => {
+  const abs = Math.abs(value)
+
+  if (abs >= 1e12) {
+    return `$${(value / 1e12).toFixed(2)}T`
+  }
+
+  if (abs >= 1e9) {
+    return `$${(value / 1e9).toFixed(1)}B`
+  }
+
+  if (abs >= 1e6) {
+    return `$${(value / 1e6).toFixed(1)}M`
+  }
+
+  if (abs >= 1e3) {
+    return `$${(value / 1e3).toFixed(1)}K`
+  }
+
+  return formatUsd(value)
+}

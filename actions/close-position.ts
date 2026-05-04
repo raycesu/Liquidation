@@ -2,13 +2,20 @@
 
 import { revalidatePath } from "next/cache"
 import { requireCurrentUser } from "@/lib/auth"
-import { fetchSpotPrice } from "@/lib/binance"
+import { fetchMarketPrice } from "@/lib/pricing"
 import { getSql } from "@/lib/db"
 import { calculatePnl, floorRealizedPnl } from "@/lib/perpetuals"
-import type { ActionResult, Position, RoomParticipant } from "@/lib/types"
+import type { ActionResult, Position, RoomParticipant, Trade } from "@/lib/types"
 
 type PositionWithParticipant = Position & {
   room_participants: RoomParticipant | null
+}
+
+export type ClosePositionResult = {
+  positionId: string
+  realizedPnl: number
+  trade: Trade
+  availableMargin: number
 }
 
 export const closePosition = async ({
@@ -17,7 +24,7 @@ export const closePosition = async ({
 }: {
   positionId: string
   roomId: string
-}): Promise<ActionResult<{ positionId: string; realizedPnl: number }>> => {
+}): Promise<ActionResult<ClosePositionResult>> => {
   const user = await requireCurrentUser()
 
   if (!user) {
@@ -63,7 +70,7 @@ export const closePosition = async ({
     return { ok: false, error: "Position is already closed" }
   }
 
-  const finalPrice = await fetchSpotPrice(position.symbol)
+  const finalPrice = await fetchMarketPrice(position.symbol)
   const rawPnl = calculatePnl({
     entryPrice: position.entry_price,
     livePrice: finalPrice,
@@ -71,8 +78,10 @@ export const closePosition = async ({
     size: position.size,
   })
   const realizedPnl = floorRealizedPnl(rawPnl, position.margin_allocated)
-  const nextAvailableMargin =
-    position.room_participants.available_margin + position.margin_allocated + realizedPnl
+  const nextAvailableMargin = Math.max(
+    0,
+    position.room_participants.available_margin + position.margin_allocated + realizedPnl,
+  )
   const nextTotalEquity = Math.max(0, nextAvailableMargin)
 
   await sql`
@@ -84,12 +93,64 @@ export const closePosition = async ({
 
   await sql`
     update room_participants
-    set available_margin = ${Math.max(0, nextAvailableMargin)},
+    set available_margin = ${nextAvailableMargin},
         total_equity = ${nextTotalEquity}
     where id = ${position.room_participants.id}
   `
 
+  await sql`
+    update orders
+    set status = 'CANCELLED',
+        cancelled_at = now()
+    where position_id = ${position.id}
+      and status = 'PENDING'
+  `
+
+  const tradeDirection = position.side === "LONG" ? "CLOSE_LONG" : "CLOSE_SHORT"
+  const tradeRows = (await sql`
+    insert into trades (
+      participant_id,
+      position_id,
+      symbol,
+      direction,
+      price,
+      size,
+      trade_value,
+      realized_pnl
+    )
+    values (
+      ${position.room_participants.id},
+      ${position.id},
+      ${position.symbol},
+      ${tradeDirection},
+      ${finalPrice},
+      ${position.size},
+      ${position.size},
+      ${realizedPnl}
+    )
+    returning
+      id::text,
+      participant_id::text,
+      position_id::text,
+      symbol,
+      direction,
+      price::float8 as price,
+      size::float8 as size,
+      trade_value::float8 as trade_value,
+      realized_pnl::float8 as realized_pnl,
+      created_at::text
+  `) as Trade[]
+  const trade = tradeRows[0]
+
   revalidatePath(`/room/${roomId}/trade`)
   revalidatePath(`/room/${roomId}`)
-  return { ok: true, data: { positionId: position.id, realizedPnl } }
+  return {
+    ok: true,
+    data: {
+      positionId: position.id,
+      realizedPnl,
+      trade,
+      availableMargin: nextAvailableMargin,
+    },
+  }
 }

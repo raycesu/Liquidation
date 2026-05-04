@@ -5,8 +5,12 @@ jest.mock("@/actions/place-order", () => ({
   placeOrder: jest.fn(),
 }))
 
+jest.mock("@/actions/place-limit-order", () => ({
+  placeLimitOrder: jest.fn(),
+}))
+
 describe("OrderEntry", () => {
-  it("shows required margin and action buttons", () => {
+  it("renders Buy/Long, Sell/Short and the action button", () => {
     render(
       <OrderEntry
         participantId="00000000-0000-0000-0000-000000000000"
@@ -14,14 +18,16 @@ describe("OrderEntry", () => {
         symbol="BTCUSDT"
         availableMargin={10000}
         livePrice={65000}
+        positions={[]}
         onOptimisticPosition={jest.fn()}
         onOrderPlaced={jest.fn()}
         onOrderRejected={jest.fn()}
+        onLimitOrderPlaced={jest.fn()}
       />,
     )
 
-    expect(screen.getByText("Required margin")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Long" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Short" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Buy long" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Sell short" })).toBeInTheDocument()
+    expect(screen.getByText(/Margin Required/)).toBeInTheDocument()
   })
 })

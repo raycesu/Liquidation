@@ -1,8 +1,8 @@
 "use server"
 
-import { fetchSpotPrices } from "@/lib/binance"
 import { getSql } from "@/lib/db"
-import { supportedSymbols, type ActionResult, type Position, type SupportedSymbol } from "@/lib/types"
+import { fetchMarketPrices } from "@/lib/pricing"
+import type { ActionResult, Position, SupportedSymbol } from "@/lib/types"
 
 type LiquidationPosition = Position & {
   room_participants: {
@@ -52,7 +52,7 @@ export const liquidateRoom = async (roomId: string): Promise<ActionResult<{ liqu
   }
 
   const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol))) as SupportedSymbol[]
-  const prices = await fetchSpotPrices(symbols.length > 0 ? symbols : [...supportedSymbols])
+  const prices = await fetchMarketPrices(symbols)
   const updatedAt = new Date().toISOString()
 
   for (const [symbol, price] of Object.entries(prices)) {
@@ -70,7 +70,16 @@ export const liquidateRoom = async (roomId: string): Promise<ActionResult<{ liqu
   for (const position of roomPositions) {
     const livePrice = prices[position.symbol]
 
-    if (!isUnderwater(position, livePrice) || !position.room_participants) {
+    if (
+      livePrice == null ||
+      !Number.isFinite(livePrice) ||
+      livePrice <= 0 ||
+      !position.room_participants
+    ) {
+      continue
+    }
+
+    if (!isUnderwater(position, livePrice)) {
       continue
     }
 

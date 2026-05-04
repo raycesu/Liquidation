@@ -4,7 +4,7 @@ import { liquidateRoom } from "@/actions/liquidate"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { fetchSpotPrices } from "@/lib/binance"
+import { fetchMarketPrices } from "@/lib/pricing"
 import { requireCurrentUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { formatUsd } from "@/lib/format"
@@ -84,7 +84,8 @@ export default async function LeaderboardPage({ params }: LeaderboardPageProps) 
       and rp.room_id = ${roomId}
   `) as RoomPosition[]
   const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol))) as SupportedSymbol[]
-  const prices: Partial<Record<SupportedSymbol, number>> = symbols.length > 0 ? await fetchSpotPrices(symbols) : {}
+  const prices: Partial<Record<SupportedSymbol, number>> =
+    symbols.length > 0 ? await fetchMarketPrices(symbols) : {}
   const pnlByParticipant = new Map<string, number>()
 
   roomPositions.forEach((position) => {

@@ -18,7 +18,8 @@
 - NEVER call any WebSocket from a Server Component, Server Action, or API route.
   A server-side WebSocket would mean one IP hits Binance for all users and get banned.
 - The custom hook for this is `useBinanceTicker` in `/hooks/useBinanceTicker.ts`.
-  Always import live prices from this hook on the client.
+  It exposes live last prices plus 24h stats (change %, quote volume) from the same stream.
+  Always import live market data from this hook on the client.
 
 ### Server Actions vs Client
 - Server Actions use the Binance REST endpoint for price fetches:
@@ -129,11 +130,13 @@ Never hardcode hex colors inline. Always reference these variables.
   Slider, Input, Table, Tabs, Badge).
 - Customize via CSS variables, not by modifying shadcn source files directly.
 
-### lightweight-charts
-- The charting library is `lightweight-charts`. No other chart libraries for the
-  price chart. Use `createChart` from the library.
-- Always clean up the chart instance on component unmount to prevent memory leaks.
-- Historical data for the chart comes from Binance Klines API, fetched client-side.
+### TradingView chart (embed)
+- The trade page chart is the free TradingView Advanced Chart widget loaded from
+  `https://s3.tradingview.com/tv.js` inside `TradingViewChart` (`/components/tradingview-chart.tsx`).
+- Symbols map to TradingView pairs (e.g. `BINANCE:BTCUSDT`). Timeframes, chart types,
+  and indicators use TradingView’s built-in UI; keep TradingView attribution visible.
+- On unmount or symbol change, clear the chart container and drop widget references
+  to avoid duplicate embeds.
 
 ### Leverage Slider
 - Range: 1x to 20x. Step: 1. Default: 5x.
@@ -177,7 +180,7 @@ Open Positions table. Reconcile on server response.
 
 ### Loading States
 Always show a loading skeleton for: leaderboard data, open positions table,
-chart historical data. Never show a blank screen while fetching.
+async-loaded panels. Never show a blank screen while fetching.
 
 ### Error Handling
 - Insufficient margin → show a clear inline error on the order form, not a toast.

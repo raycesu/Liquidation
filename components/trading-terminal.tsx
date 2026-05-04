@@ -1,137 +1,295 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { checkPendingOrders } from "@/actions/check-pending-orders"
 import { OrderEntry } from "@/components/order-entry"
-import { OpenPositions } from "@/components/open-positions"
-import { TradingChart } from "@/components/trading-chart"
+import { PositionsPanel } from "@/components/positions-panel"
+import { TradingViewChart } from "@/components/tradingview-chart"
+import { AssetSelector } from "@/components/asset-selector"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useBinanceTicker } from "@/hooks/useBinanceTicker"
-import { formatNumber, formatUsd } from "@/lib/format"
-import { supportedSymbols, type Position, type SupportedSymbol } from "@/lib/types"
+import { formatCompactUsd, formatNumber, formatPercent } from "@/lib/format"
+import { defaultMarketSymbol, getMarket } from "@/lib/markets"
+import { cn } from "@/lib/utils"
+import type { PendingOrder, Position, Trade } from "@/lib/types"
+import type { CancelOrderResult } from "@/actions/cancel-order"
+import type { ClosePositionResult } from "@/actions/close-position"
+import type { PlaceOrderResult } from "@/actions/place-order"
+import type { SetPositionTriggersResult } from "@/actions/set-position-triggers"
 
 type TradingTerminalProps = {
   roomId: string
   participantId: string
   initialAvailableMargin: number
   initialPositions: Position[]
+  initialPendingOrders: PendingOrder[]
+  initialTrades: Trade[]
 }
 
-const symbolLabels: Record<SupportedSymbol, string> = {
-  BTCUSDT: "BTC",
-  ETHUSDT: "ETH",
-  SOLUSDT: "SOL",
-}
+const WATCHER_INTERVAL_MS = 2000
 
 export const TradingTerminal = ({
   roomId,
   participantId,
   initialAvailableMargin,
   initialPositions,
+  initialPendingOrders,
+  initialTrades,
 }: TradingTerminalProps) => {
-  const [symbol, setSymbol] = useState<SupportedSymbol>("BTCUSDT")
+  const [symbol, setSymbol] = useState(defaultMarketSymbol)
   const [availableMargin, setAvailableMargin] = useState(initialAvailableMargin)
   const [positions, setPositions] = useState(initialPositions)
-  const { prices, isConnected } = useBinanceTicker()
+  const [pendingOrders, setPendingOrders] = useState(initialPendingOrders)
+  const [trades, setTrades] = useState(initialTrades)
+  const { prices, statsBySymbol, isConnected } = useBinanceTicker()
   const selectedPrice = prices[symbol]
+  const selectedStats = statsBySymbol[symbol]
+  const watcherInflightRef = useRef(false)
+  const lastWatcherRunRef = useRef(0)
 
   const openPositions = useMemo(() => positions.filter((position) => position.is_open), [positions])
+  const activePendingOrders = useMemo(
+    () => pendingOrders.filter((order) => order.status === "PENDING"),
+    [pendingOrders],
+  )
+
+  const changeToneClass = useMemo(() => {
+    if (selectedStats == null) {
+      return "text-text-primary"
+    }
+    return selectedStats.changeAbs >= 0 ? "text-profit" : "text-loss"
+  }, [selectedStats])
 
   const handleOptimisticPosition = (position: Position) => {
-    setPositions((currentPositions) => [position, ...currentPositions])
-    setAvailableMargin((currentMargin) => Math.max(0, currentMargin - position.margin_allocated))
+    setPositions((current) => [position, ...current])
+    setAvailableMargin((current) => Math.max(0, current - position.margin_allocated))
   }
 
-  const handleOrderPlaced = (optimisticId: string, position: Position) => {
-    setPositions((currentPositions) =>
-      currentPositions.map((currentPosition) => (currentPosition.id === optimisticId ? position : currentPosition)),
+  const handleOrderPlaced = (optimisticId: string, payload: PlaceOrderResult) => {
+    setPositions((current) =>
+      current.map((position) => (position.id === optimisticId ? payload.position : position)),
     )
+    setTrades((current) => [payload.trade, ...current])
+
+    if (payload.triggers.length > 0) {
+      setPendingOrders((current) => [...payload.triggers, ...current])
+    }
+
+    setAvailableMargin(payload.availableMargin)
   }
 
   const handleOrderRejected = (optimisticId: string) => {
-    setPositions((currentPositions) => {
-      const rejectedPosition = currentPositions.find((position) => position.id === optimisticId)
+    setPositions((current) => {
+      const rejected = current.find((position) => position.id === optimisticId)
 
-      if (rejectedPosition) {
-        setAvailableMargin((currentMargin) => currentMargin + rejectedPosition.margin_allocated)
+      if (rejected) {
+        setAvailableMargin((margin) => margin + rejected.margin_allocated)
       }
 
-      return currentPositions.filter((position) => position.id !== optimisticId)
+      return current.filter((position) => position.id !== optimisticId)
     })
   }
 
-  const handlePositionClosed = (positionId: string) => {
-    setPositions((currentPositions) => currentPositions.filter((position) => position.id !== positionId))
+  const handleLimitOrderPlaced = (order: PendingOrder, nextAvailableMargin: number) => {
+    setPendingOrders((current) => [order, ...current])
+    setAvailableMargin(nextAvailableMargin)
   }
+
+  const handlePositionClosed = (payload: ClosePositionResult) => {
+    setPositions((current) => current.filter((position) => position.id !== payload.positionId))
+    setPendingOrders((current) =>
+      current.map((order) =>
+        order.position_id === payload.positionId && order.status === "PENDING"
+          ? { ...order, status: "CANCELLED", cancelled_at: new Date().toISOString() }
+          : order,
+      ),
+    )
+    setTrades((current) => [payload.trade, ...current])
+    setAvailableMargin(payload.availableMargin)
+  }
+
+  const handleTriggersUpdated = (payload: SetPositionTriggersResult) => {
+    setPendingOrders((current) => {
+      const stripped = current.filter(
+        (order) =>
+          !(
+            order.position_id === payload.positionId &&
+            order.status === "PENDING" &&
+            (order.type === "TAKE_PROFIT" || order.type === "STOP_LOSS")
+          ),
+      )
+      return [...payload.triggers, ...stripped]
+    })
+  }
+
+  const handleOrderCancelled = (payload: CancelOrderResult) => {
+    setPendingOrders((current) =>
+      current.map((order) =>
+        order.id === payload.orderId
+          ? { ...order, status: "CANCELLED", cancelled_at: new Date().toISOString() }
+          : order,
+      ),
+    )
+    setAvailableMargin(payload.availableMargin)
+  }
+
+  useEffect(() => {
+    if (activePendingOrders.length === 0) {
+      return
+    }
+
+    const intervalId = window.setInterval(async () => {
+      if (watcherInflightRef.current) {
+        return
+      }
+
+      const now = Date.now()
+
+      if (now - lastWatcherRunRef.current < WATCHER_INTERVAL_MS) {
+        return
+      }
+
+      watcherInflightRef.current = true
+      lastWatcherRunRef.current = now
+
+      try {
+        const result = await checkPendingOrders({ roomId })
+
+        if (!result.ok) {
+          return
+        }
+
+        const { filledOrderIds, cancelledOrderIds, newPositions, closedPositionIds, trades: newTrades, availableMargin: nextMargin } =
+          result.data
+
+        if (filledOrderIds.length > 0 || cancelledOrderIds.length > 0) {
+          setPendingOrders((current) =>
+            current.map((order) => {
+              if (filledOrderIds.includes(order.id)) {
+                return { ...order, status: "FILLED", filled_at: new Date().toISOString() }
+              }
+
+              if (cancelledOrderIds.includes(order.id)) {
+                return { ...order, status: "CANCELLED", cancelled_at: new Date().toISOString() }
+              }
+
+              return order
+            }),
+          )
+        }
+
+        if (newPositions.length > 0) {
+          setPositions((current) => [...newPositions, ...current])
+        }
+
+        if (closedPositionIds.length > 0) {
+          setPositions((current) => current.filter((position) => !closedPositionIds.includes(position.id)))
+        }
+
+        if (newTrades.length > 0) {
+          setTrades((current) => [...newTrades, ...current])
+        }
+
+        if (nextMargin != null) {
+          setAvailableMargin(nextMargin)
+        }
+      } finally {
+        watcherInflightRef.current = false
+      }
+    }, WATCHER_INTERVAL_MS)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [activePendingOrders.length, roomId])
+
+  const changeLabel =
+    selectedStats == null
+      ? "--"
+      : `${selectedStats.changeAbs >= 0 ? "+" : ""}${formatNumber(selectedStats.changeAbs)} / ${selectedStats.changePercent >= 0 ? "+" : ""}${formatPercent(selectedStats.changePercent)}`
 
   return (
     <main className="min-h-screen bg-background px-4 py-6">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <header className="flex flex-col gap-3">
           <div>
             <p className="text-sm uppercase tracking-[0.35em] text-accent-neon">Trading terminal</p>
             <div className="mt-2 flex items-center gap-3">
-              <h1 className="text-3xl font-semibold text-text-primary">{symbolLabels[symbol]} Perp</h1>
+              <h1 className="text-3xl font-semibold text-text-primary">
+                {getMarket(symbol)?.displayName ?? symbol} Perp
+              </h1>
               <Badge className={isConnected ? "bg-profit/10 text-profit" : "bg-loss/10 text-loss"}>
                 {isConnected ? "Live" : "Connecting"}
               </Badge>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Card className="border-border bg-surface">
-              <CardContent className="p-3">
-                <p className="text-xs text-text-secondary">Mark price</p>
-                <p className="font-mono text-xl text-text-primary">
-                  {selectedPrice ? formatNumber(selectedPrice) : "--"}
+
+          <div
+            className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-border pb-4"
+            role="toolbar"
+            aria-label="Market and symbol controls"
+          >
+            <AssetSelector value={symbol} onChange={setSymbol} prices={prices} statsBySymbol={statsBySymbol} />
+
+            <div className="hidden h-8 w-px bg-border sm:block" aria-hidden />
+
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-text-secondary">Mark</p>
+                <p className="font-mono text-base text-text-primary">
+                  {selectedPrice != null ? `$${formatNumber(selectedPrice)}` : "--"}
                 </p>
-              </CardContent>
-            </Card>
-            <Button asChild variant="outline">
-              <Link href={`/room/${roomId}`}>Lobby</Link>
-            </Button>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-text-secondary">24h change</p>
+                <p className={cn("font-mono text-base", changeToneClass)}>{changeLabel}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-text-secondary">24h volume</p>
+                <p className="font-mono text-base text-text-primary">
+                  {selectedStats != null ? formatCompactUsd(selectedStats.quoteVolume) : "--"}
+                </p>
+              </div>
+            </div>
+
+            <div className="ml-auto flex shrink-0 items-center">
+              <Button asChild variant="outline">
+                <Link href={`/room/${roomId}`}>Lobby</Link>
+              </Button>
+            </div>
           </div>
         </header>
 
-        <Tabs value={symbol} onValueChange={(value) => setSymbol(value as SupportedSymbol)}>
-          <TabsList className="bg-surface">
-            {supportedSymbols.map((supportedSymbol) => (
-              <TabsTrigger key={supportedSymbol} value={supportedSymbol}>
-                {symbolLabels[supportedSymbol]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-
         <section className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,1fr)]">
-          <div className="flex flex-col gap-4">
-            <TradingChart symbol={symbol} />
-            <OpenPositions
+          <div className="flex min-w-0 flex-col gap-4">
+            <TradingViewChart symbol={symbol} />
+            <PositionsPanel
               roomId={roomId}
               positions={openPositions}
+              pendingOrders={activePendingOrders}
+              trades={trades}
               prices={prices}
               onPositionClosed={handlePositionClosed}
+              onTriggersUpdated={handleTriggersUpdated}
+              onOrderCancelled={handleOrderCancelled}
             />
           </div>
           <div className="flex flex-col gap-4">
             <OrderEntry
+              key={symbol}
               participantId={participantId}
               roomId={roomId}
               symbol={symbol}
               availableMargin={availableMargin}
               livePrice={selectedPrice}
+              positions={openPositions}
               onOptimisticPosition={handleOptimisticPosition}
               onOrderPlaced={handleOrderPlaced}
               onOrderRejected={handleOrderRejected}
+              onLimitOrderPlaced={handleLimitOrderPlaced}
             />
-            <Card className="border-border bg-surface">
-              <CardContent className="space-y-2 p-5">
-                <p className="text-sm text-text-secondary">Available margin</p>
-                <p className="font-mono text-3xl text-text-primary">{formatUsd(availableMargin)}</p>
-              </CardContent>
-            </Card>
           </div>
         </section>
       </div>

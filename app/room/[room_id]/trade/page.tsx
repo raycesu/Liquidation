@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { TradingTerminal } from "@/components/trading-terminal"
 import { requireCurrentUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
-import type { Position, RoomParticipant } from "@/lib/types"
+import type { PendingOrder, Position, RoomParticipant, Trade } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
@@ -60,12 +60,55 @@ export default async function TradePage({ params }: TradePageProps) {
     order by created_at desc
   `) as Position[]
 
+  const pendingOrders = (await sql`
+    select
+      id::text,
+      participant_id::text,
+      position_id::text,
+      symbol,
+      side,
+      type,
+      size::float8 as size,
+      leverage,
+      trigger_price::float8 as trigger_price,
+      reduce_only,
+      status,
+      margin_reserved::float8 as margin_reserved,
+      created_at::text,
+      filled_at::text,
+      cancelled_at::text
+    from orders
+    where participant_id = ${participant.id}
+      and status = 'PENDING'
+    order by created_at desc
+  `) as PendingOrder[]
+
+  const trades = (await sql`
+    select
+      id::text,
+      participant_id::text,
+      position_id::text,
+      symbol,
+      direction,
+      price::float8 as price,
+      size::float8 as size,
+      trade_value::float8 as trade_value,
+      realized_pnl::float8 as realized_pnl,
+      created_at::text
+    from trades
+    where participant_id = ${participant.id}
+    order by created_at desc
+    limit 50
+  `) as Trade[]
+
   return (
     <TradingTerminal
       roomId={roomId}
       participantId={participant.id}
       initialAvailableMargin={participant.available_margin}
       initialPositions={positions}
+      initialPendingOrders={pendingOrders}
+      initialTrades={trades}
     />
   )
 }
