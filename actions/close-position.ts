@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { z } from "zod"
 import { requireCurrentUser } from "@/lib/auth"
 import { fetchMarketPrice } from "@/lib/pricing"
 import { getSql } from "@/lib/db"
@@ -18,6 +19,11 @@ export type ClosePositionResult = {
   availableMargin: number
 }
 
+const closePositionSchema = z.object({
+  positionId: z.string().uuid(),
+  roomId: z.string().uuid(),
+})
+
 export const closePosition = async ({
   positionId,
   roomId,
@@ -25,6 +31,12 @@ export const closePosition = async ({
   positionId: string
   roomId: string
 }): Promise<ActionResult<ClosePositionResult>> => {
+  const parsed = closePositionSchema.safeParse({ positionId, roomId })
+
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" }
+  }
+
   const user = await requireCurrentUser()
 
   if (!user) {
@@ -84,12 +96,18 @@ export const closePosition = async ({
   )
   const nextTotalEquity = Math.max(0, nextAvailableMargin)
 
-  await sql`
+  const closedRows = (await sql`
     update positions
     set is_open = false,
         closed_at = now()
     where id = ${position.id}
-  `
+      and is_open = true
+    returning id::text
+  `) as { id: string }[]
+
+  if (!closedRows[0]) {
+    return { ok: false, error: "Position is already closed" }
+  }
 
   await sql`
     update room_participants
@@ -142,8 +160,9 @@ export const closePosition = async ({
   `) as Trade[]
   const trade = tradeRows[0]
 
-  revalidatePath(`/room/${roomId}/trade`)
-  revalidatePath(`/room/${roomId}`)
+  const authorizedRoomId = position.room_participants.room_id
+  revalidatePath(`/room/${authorizedRoomId}/trade`)
+  revalidatePath(`/room/${authorizedRoomId}`)
   return {
     ok: true,
     data: {

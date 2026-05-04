@@ -1,11 +1,19 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { z } from "zod"
 import { requireCurrentUser } from "@/lib/auth"
 import { isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrices } from "@/lib/pricing"
 import { getSql } from "@/lib/db"
 import { calculateLiquidationPrice, calculatePnl, floorRealizedPnl } from "@/lib/perpetuals"
+import {
+  getLimitFillPrice,
+  getTriggerPriority,
+  isLimitTriggered,
+  isStopLossTriggered,
+  isTakeProfitTriggered,
+} from "@/lib/trading-rules"
 import type {
   ActionResult,
   PendingOrder,
@@ -30,35 +38,16 @@ export type CheckPendingOrdersResult = {
   availableMargin: number | null
 }
 
-const isLimitTriggered = (order: PendingOrder, price: number) => {
-  if (order.side === "LONG") {
-    return price <= order.trigger_price
-  }
-
-  return price >= order.trigger_price
-}
-
-const isTakeProfitTriggered = (order: PendingOrder, price: number) => {
-  if (order.side === "LONG") {
-    return price <= order.trigger_price
-  }
-
-  return price >= order.trigger_price
-}
-
-const isStopLossTriggered = (order: PendingOrder, price: number) => {
-  if (order.side === "LONG") {
-    return price >= order.trigger_price
-  }
-
-  return price <= order.trigger_price
-}
-
 export const checkPendingOrders = async ({
   roomId,
 }: {
   roomId: string
 }): Promise<ActionResult<CheckPendingOrdersResult>> => {
+  const parsed = z.string().uuid().safeParse(roomId)
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid room id" }
+  }
+
   const user = await requireCurrentUser()
 
   if (!user) {
@@ -96,7 +85,6 @@ export const checkPendingOrders = async ({
       o.size::float8 as size,
       o.leverage,
       o.trigger_price::float8 as trigger_price,
-      o.reduce_only,
       o.status,
       o.margin_reserved::float8 as margin_reserved,
       o.created_at::text,
@@ -146,24 +134,9 @@ export const checkPendingOrders = async ({
     }
   }
 
-  const symbols = Array.from(new Set(orders.map((order) => order.symbol))).filter(isSupportedSymbol) as SupportedSymbol[]
-
-  if (symbols.length === 0) {
-    return {
-      ok: true,
-      data: {
-        filledOrderIds: [],
-        cancelledOrderIds: [],
-        newPositions: [],
-        closedPositionIds: [],
-        trades: [],
-        availableMargin: participant.available_margin,
-      },
-    }
-  }
-
-  const prices = await fetchMarketPrices(symbols)
-
+  const supportedOrders = orders.filter((order) => isSupportedSymbol(order.symbol))
+  const unsupportedOrders = orders.filter((order) => !isSupportedSymbol(order.symbol))
+  const symbols = Array.from(new Set(supportedOrders.map((order) => order.symbol))) as SupportedSymbol[]
   const filledOrderIds: string[] = []
   const cancelledOrderIds: string[] = []
   const newPositions: Position[] = []
@@ -172,7 +145,53 @@ export const checkPendingOrders = async ({
 
   let availableMargin = participant.available_margin
 
-  for (const order of orders) {
+  if (unsupportedOrders.length > 0) {
+    const unsupportedOrderIds = unsupportedOrders.map((order) => order.id)
+    await sql`
+      update orders
+      set status = 'CANCELLED',
+          cancelled_at = now()
+      where id = any(${unsupportedOrderIds})
+        and status = 'PENDING'
+    `
+    cancelledOrderIds.push(...unsupportedOrderIds)
+
+    const releasedMargin = unsupportedOrders.reduce((sum, order) => sum + order.margin_reserved, 0)
+    if (releasedMargin > 0) {
+      availableMargin += releasedMargin
+      await sql`
+        update room_participants
+        set available_margin = ${availableMargin}
+        where id = ${participant.id}
+      `
+    }
+  }
+
+  if (symbols.length === 0) {
+    return {
+      ok: true,
+      data: {
+        filledOrderIds: [],
+        cancelledOrderIds,
+        newPositions: [],
+        closedPositionIds: [],
+        trades: [],
+        availableMargin,
+      },
+    }
+  }
+
+  const prices = await fetchMarketPrices(symbols)
+
+  const sortedOrders = [...supportedOrders].sort((a, b) => {
+    const priority = getTriggerPriority(a) - getTriggerPriority(b)
+    if (priority !== 0) {
+      return priority
+    }
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  })
+
+  for (const order of sortedOrders) {
     const livePrice = prices[order.symbol]
 
     if (livePrice == null || !Number.isFinite(livePrice) || livePrice <= 0) {
@@ -184,9 +203,23 @@ export const checkPendingOrders = async ({
         continue
       }
 
+      const claimedOrderRows = (await sql`
+        update orders
+        set status = 'FILLED',
+            filled_at = now()
+        where id = ${order.id}
+          and status = 'PENDING'
+        returning id::text
+      `) as { id: string }[]
+
+      if (!claimedOrderRows[0]) {
+        continue
+      }
+
       const positionSide: PositionSide = order.side
+      const fillPrice = getLimitFillPrice(order, livePrice)
       const liquidationPrice = calculateLiquidationPrice({
-        entryPrice: livePrice,
+        entryPrice: fillPrice,
         leverage: order.leverage,
         side: positionSide,
       })
@@ -210,7 +243,7 @@ export const checkPendingOrders = async ({
           ${order.leverage},
           ${order.size},
           ${order.margin_reserved},
-          ${livePrice},
+          ${fillPrice},
           ${liquidationPrice},
           true
         )
@@ -253,7 +286,7 @@ export const checkPendingOrders = async ({
           ${newPosition.id},
           ${order.symbol},
           ${tradeDirection},
-          ${livePrice},
+          ${fillPrice},
           ${order.size},
           ${order.size},
           null
@@ -274,13 +307,6 @@ export const checkPendingOrders = async ({
       if (tradeRows[0]) {
         trades.push(tradeRows[0])
       }
-
-      await sql`
-        update orders
-        set status = 'FILLED',
-            filled_at = now()
-        where id = ${order.id}
-      `
 
       filledOrderIds.push(order.id)
       continue
@@ -332,12 +358,18 @@ export const checkPendingOrders = async ({
       availableMargin + attachedPosition.margin_allocated + realizedPnl,
     )
 
-    await sql`
+    const closedRows = (await sql`
       update positions
       set is_open = false,
           closed_at = now()
       where id = ${attachedPosition.id}
-    `
+        and is_open = true
+      returning id::text
+    `) as { id: string }[]
+
+    if (!closedRows[0]) {
+      continue
+    }
 
     await sql`
       update room_participants
@@ -357,12 +389,18 @@ export const checkPendingOrders = async ({
         and id <> ${order.id}
     `
 
-    await sql`
+    const claimedTriggerRows = (await sql`
       update orders
       set status = 'FILLED',
           filled_at = now()
       where id = ${order.id}
-    `
+        and status = 'PENDING'
+      returning id::text
+    `) as { id: string }[]
+
+    if (!claimedTriggerRows[0]) {
+      continue
+    }
 
     const tradeDirection = attachedPosition.side === "LONG" ? "CLOSE_LONG" : "CLOSE_SHORT"
     const tradeRows = (await sql`

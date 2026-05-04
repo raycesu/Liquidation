@@ -7,6 +7,7 @@ import { getSql } from "@/lib/db"
 import { getMaxLeverage, isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrice } from "@/lib/pricing"
 import { calculateLiquidationPrice, calculateRequiredMargin } from "@/lib/perpetuals"
+import { getTriggerSide } from "@/lib/trading-rules"
 import type {
   ActionResult,
   PendingOrder,
@@ -123,6 +124,19 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
     }
   }
 
+  const marginRows = (await sql`
+    update room_participants
+    set available_margin = available_margin - ${requiredMargin}
+    where id = ${participant.id}
+      and available_margin >= ${requiredMargin}
+    returning available_margin::float8 as available_margin
+  `) as Pick<RoomParticipant, "available_margin">[]
+  const marginRow = marginRows[0]
+
+  if (!marginRow) {
+    return { ok: false, error: "Insufficient margin." }
+  }
+
   const positions = (await sql`
     insert into positions (
       participant_id,
@@ -163,17 +177,14 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
   const position = positions[0]
 
   if (!position) {
+    await sql`
+      update room_participants
+      set available_margin = available_margin + ${requiredMargin}
+      where id = ${participant.id}
+    `
     return { ok: false, error: "Unable to place order" }
   }
-
-  const nextAvailableMargin = participant.available_margin - requiredMargin
-
-  await sql`
-    update room_participants
-    set available_margin = ${nextAvailableMargin},
-        total_equity = ${participant.total_equity}
-    where id = ${participant.id}
-  `
+  const nextAvailableMargin = marginRow.available_margin
 
   const tradeDirection = side === "LONG" ? "OPEN_LONG" : "OPEN_SHORT"
   const tradeRows = (await sql`
@@ -213,7 +224,7 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
 
   const triggers: PendingOrder[] = []
 
-  const triggerSide: PositionSide = side === "LONG" ? "SHORT" : "LONG"
+  const triggerSide = getTriggerSide(side)
 
   if (parsed.data.takeProfitPrice != null) {
     const tpRows = (await sql`
@@ -226,7 +237,6 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
         size,
         leverage,
         trigger_price,
-        reduce_only,
         status,
         margin_reserved
       )
@@ -239,7 +249,6 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
         ${parsed.data.size},
         ${parsed.data.leverage},
         ${parsed.data.takeProfitPrice},
-        true,
         'PENDING',
         0
       )
@@ -253,7 +262,6 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
         size::float8 as size,
         leverage,
         trigger_price::float8 as trigger_price,
-        reduce_only,
         status,
         margin_reserved::float8 as margin_reserved,
         created_at::text,
@@ -277,7 +285,6 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
         size,
         leverage,
         trigger_price,
-        reduce_only,
         status,
         margin_reserved
       )
@@ -290,7 +297,6 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
         ${parsed.data.size},
         ${parsed.data.leverage},
         ${parsed.data.stopLossPrice},
-        true,
         'PENDING',
         0
       )
@@ -304,7 +310,6 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
         size::float8 as size,
         leverage,
         trigger_price::float8 as trigger_price,
-        reduce_only,
         status,
         margin_reserved::float8 as margin_reserved,
         created_at::text,

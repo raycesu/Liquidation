@@ -37,3 +37,20 @@ export const formatCompactUsd = (value: number) => {
 
   return formatUsd(value)
 }
+
+export const formatDateTime = (iso: string) => {
+  const date = new Date(iso)
+
+  if (Number.isNaN(date.getTime())) {
+    return iso
+  }
+
+  return date.toLocaleString(undefined, {
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}

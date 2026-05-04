@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
+import { DevWarningFilter } from "@/components/dev-warning-filter"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
@@ -17,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Liquidation",
   description: "Paper-trading crypto perpetuals competitions",
+  icons: {
+    apple: "/images/liquidation-logo.png",
+  },
 }
 
 type RootLayoutProps = Readonly<{
@@ -26,8 +30,13 @@ type RootLayoutProps = Readonly<{
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <ClerkProvider>
-      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} scroll-smooth dark`}>
+      <html
+        lang="en"
+        data-scroll-behavior="smooth"
+        className={`${geistSans.variable} ${geistMono.variable} scroll-smooth dark`}
+      >
         <body>
+          <DevWarningFilter />
           {children}
           <Toaster richColors theme="dark" />
         </body>

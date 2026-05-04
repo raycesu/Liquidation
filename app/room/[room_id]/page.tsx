@@ -1,6 +1,5 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { liquidateRoom } from "@/actions/liquidate"
 import { Leaderboard } from "@/components/leaderboard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,8 +24,6 @@ export default async function RoomPage({ params }: RoomPageProps) {
   if (!user) {
     redirect("/sign-in")
   }
-
-  await liquidateRoom(roomId)
 
   const sql = getSql()
   const rooms = (await sql`
@@ -78,8 +75,7 @@ export default async function RoomPage({ params }: RoomPageProps) {
       rp.created_at::text,
       json_build_object(
         'id', u.id,
-        'username', u.username,
-        'email', u.email
+        'username', u.username
       ) as users
     from room_participants rp
     join users u on u.id = rp.user_id
@@ -121,10 +117,10 @@ export default async function RoomPage({ params }: RoomPageProps) {
         <section className="grid gap-4 md:grid-cols-3">
           <Card className="border-border bg-surface">
             <CardHeader>
-              <CardTitle className="text-sm text-text-secondary">Your equity</CardTitle>
+              <CardTitle className="text-sm text-text-secondary">Your live equity</CardTitle>
             </CardHeader>
             <CardContent className="font-mono text-3xl text-text-primary">
-              {formatUsd(participant.total_equity)}
+              {formatUsd(participant.available_margin)}
             </CardContent>
           </Card>
           <Card className="border-border bg-surface">

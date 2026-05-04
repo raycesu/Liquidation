@@ -17,7 +17,6 @@ const placeLimitOrderSchema = z
     leverage: z.coerce.number().int().min(1).max(50),
     size: z.coerce.number().positive("Position size must be positive"),
     limitPrice: z.coerce.number().positive("Limit price must be positive"),
-    reduceOnly: z.boolean().optional().default(false),
   })
   .superRefine((data, ctx) => {
     if (!isSupportedSymbol(data.symbol)) {
@@ -79,13 +78,26 @@ export const placeLimitOrder = async (
     return { ok: false, error: "Participant not found" }
   }
 
-  const requiredMargin = parsed.data.reduceOnly
-    ? 0
-    : calculateRequiredMargin(parsed.data.size, parsed.data.leverage)
+  const requiredMargin = calculateRequiredMargin(parsed.data.size, parsed.data.leverage)
 
-  if (!parsed.data.reduceOnly && participant.available_margin < requiredMargin) {
+  if (participant.available_margin < requiredMargin) {
     return { ok: false, error: "Insufficient margin." }
   }
+
+  const marginRows = (await sql`
+    update room_participants
+    set available_margin = available_margin - ${requiredMargin}
+    where id = ${participant.id}
+      and available_margin >= ${requiredMargin}
+    returning available_margin::float8 as available_margin
+  `) as Pick<RoomParticipant, "available_margin">[]
+  const marginRow = marginRows[0]
+
+  if (!marginRow) {
+    return { ok: false, error: "Insufficient margin." }
+  }
+
+  const nextAvailableMargin = marginRow.available_margin
 
   const orderRows = (await sql`
     insert into orders (
@@ -97,7 +109,6 @@ export const placeLimitOrder = async (
       size,
       leverage,
       trigger_price,
-      reduce_only,
       status,
       margin_reserved
     )
@@ -110,7 +121,6 @@ export const placeLimitOrder = async (
       ${parsed.data.size},
       ${parsed.data.leverage},
       ${parsed.data.limitPrice},
-      ${parsed.data.reduceOnly},
       'PENDING',
       ${requiredMargin}
     )
@@ -124,7 +134,6 @@ export const placeLimitOrder = async (
       size::float8 as size,
       leverage,
       trigger_price::float8 as trigger_price,
-      reduce_only,
       status,
       margin_reserved::float8 as margin_reserved,
       created_at::text,
@@ -134,17 +143,12 @@ export const placeLimitOrder = async (
   const order = orderRows[0]
 
   if (!order) {
-    return { ok: false, error: "Unable to place limit order" }
-  }
-
-  const nextAvailableMargin = participant.available_margin - requiredMargin
-
-  if (requiredMargin > 0) {
     await sql`
       update room_participants
-      set available_margin = ${nextAvailableMargin}
+      set available_margin = available_margin + ${requiredMargin}
       where id = ${participant.id}
     `
+    return { ok: false, error: "Unable to place limit order" }
   }
 
   revalidatePath(`/room/${parsed.data.roomId}/trade`)

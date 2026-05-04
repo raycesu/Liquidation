@@ -1,8 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useRef, useState } from "react"
-import { checkPendingOrders } from "@/actions/check-pending-orders"
+import { useMemo, useState } from "react"
 import { OrderEntry } from "@/components/order-entry"
 import { PositionsPanel } from "@/components/positions-panel"
 import { TradingViewChart } from "@/components/tradingview-chart"
@@ -28,8 +27,6 @@ type TradingTerminalProps = {
   initialTrades: Trade[]
 }
 
-const WATCHER_INTERVAL_MS = 2000
-
 export const TradingTerminal = ({
   roomId,
   participantId,
@@ -46,8 +43,6 @@ export const TradingTerminal = ({
   const { prices, statsBySymbol, isConnected } = useBinanceTicker()
   const selectedPrice = prices[symbol]
   const selectedStats = statsBySymbol[symbol]
-  const watcherInflightRef = useRef(false)
-  const lastWatcherRunRef = useRef(0)
 
   const openPositions = useMemo(() => positions.filter((position) => position.is_open), [positions])
   const activePendingOrders = useMemo(
@@ -134,76 +129,6 @@ export const TradingTerminal = ({
     )
     setAvailableMargin(payload.availableMargin)
   }
-
-  useEffect(() => {
-    if (activePendingOrders.length === 0) {
-      return
-    }
-
-    const intervalId = window.setInterval(async () => {
-      if (watcherInflightRef.current) {
-        return
-      }
-
-      const now = Date.now()
-
-      if (now - lastWatcherRunRef.current < WATCHER_INTERVAL_MS) {
-        return
-      }
-
-      watcherInflightRef.current = true
-      lastWatcherRunRef.current = now
-
-      try {
-        const result = await checkPendingOrders({ roomId })
-
-        if (!result.ok) {
-          return
-        }
-
-        const { filledOrderIds, cancelledOrderIds, newPositions, closedPositionIds, trades: newTrades, availableMargin: nextMargin } =
-          result.data
-
-        if (filledOrderIds.length > 0 || cancelledOrderIds.length > 0) {
-          setPendingOrders((current) =>
-            current.map((order) => {
-              if (filledOrderIds.includes(order.id)) {
-                return { ...order, status: "FILLED", filled_at: new Date().toISOString() }
-              }
-
-              if (cancelledOrderIds.includes(order.id)) {
-                return { ...order, status: "CANCELLED", cancelled_at: new Date().toISOString() }
-              }
-
-              return order
-            }),
-          )
-        }
-
-        if (newPositions.length > 0) {
-          setPositions((current) => [...newPositions, ...current])
-        }
-
-        if (closedPositionIds.length > 0) {
-          setPositions((current) => current.filter((position) => !closedPositionIds.includes(position.id)))
-        }
-
-        if (newTrades.length > 0) {
-          setTrades((current) => [...newTrades, ...current])
-        }
-
-        if (nextMargin != null) {
-          setAvailableMargin(nextMargin)
-        }
-      } finally {
-        watcherInflightRef.current = false
-      }
-    }, WATCHER_INTERVAL_MS)
-
-    return () => {
-      window.clearInterval(intervalId)
-    }
-  }, [activePendingOrders.length, roomId])
 
   const changeLabel =
     selectedStats == null

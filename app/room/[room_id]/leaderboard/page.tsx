@@ -1,6 +1,5 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { liquidateRoom } from "@/actions/liquidate"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -39,9 +38,19 @@ export default async function LeaderboardPage({ params }: LeaderboardPageProps) 
     redirect("/sign-in")
   }
 
-  await liquidateRoom(roomId)
-
   const sql = getSql()
+  const membershipRows = (await sql`
+    select id::text
+    from room_participants
+    where room_id = ${roomId}
+      and user_id = ${user.id}
+    limit 1
+  `) as { id: string }[]
+
+  if (!membershipRows[0]) {
+    redirect(`/join/${roomId}`)
+  }
+
   const participants = (await sql`
     select
       rp.id::text,
@@ -52,8 +61,7 @@ export default async function LeaderboardPage({ params }: LeaderboardPageProps) 
       rp.created_at::text,
       json_build_object(
         'id', u.id,
-        'username', u.username,
-        'email', u.email
+        'username', u.username
       ) as users
     from room_participants rp
     join users u on u.id = rp.user_id

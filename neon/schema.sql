@@ -59,7 +59,6 @@ create table if not exists public.orders (
   size numeric not null check (size > 0),
   leverage integer not null check (leverage between 1 and 50),
   trigger_price numeric not null check (trigger_price > 0),
-  reduce_only boolean not null default false,
   status text not null default 'PENDING' check (status in ('PENDING', 'FILLED', 'CANCELLED')),
   margin_reserved numeric not null default 0 check (margin_reserved >= 0),
   created_at timestamptz not null default now(),
@@ -92,48 +91,6 @@ create index if not exists orders_pending_idx on public.orders (status) where st
 create index if not exists trades_participant_id_idx on public.trades (participant_id);
 create index if not exists trades_position_id_idx on public.trades (position_id);
 create index if not exists trades_created_at_idx on public.trades (created_at desc);
-
-create or replace function public.liquidate_underwater_positions()
-returns integer
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  liquidated_count integer;
-begin
-  with underwater_positions as (
-    select
-      p.id,
-      p.participant_id
-    from public.positions p
-    join public.latest_prices lp on lp.symbol = p.symbol
-    join public.room_participants rp on rp.id = p.participant_id
-    join public.rooms r on r.id = rp.room_id
-    where p.is_open = true
-      and r.is_active = true
-      and lp.updated_at > now() - interval '10 minutes'
-      and (
-        (p.side = 'LONG' and lp.price <= p.liquidation_price)
-        or (p.side = 'SHORT' and lp.price >= p.liquidation_price)
-      )
-  ),
-  closed_positions as (
-    update public.positions p
-    set is_open = false,
-        closed_at = now()
-    from underwater_positions up
-    where p.id = up.id
-    returning p.participant_id
-  )
-  update public.room_participants rp
-  set total_equity = rp.available_margin
-  where rp.id in (select participant_id from closed_positions);
-
-  get diagnostics liquidated_count = row_count;
-  return liquidated_count;
-end;
-$$;
 
 create or replace function public.current_app_user_id()
 returns text

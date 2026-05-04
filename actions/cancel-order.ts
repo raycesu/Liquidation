@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { z } from "zod"
 import { requireCurrentUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import type { ActionResult, PendingOrder, RoomParticipant } from "@/lib/types"
@@ -14,6 +15,11 @@ export type CancelOrderResult = {
   availableMargin: number
 }
 
+const cancelOrderSchema = z.object({
+  orderId: z.string().uuid(),
+  roomId: z.string().uuid(),
+})
+
 export const cancelOrder = async ({
   orderId,
   roomId,
@@ -21,6 +27,12 @@ export const cancelOrder = async ({
   orderId: string
   roomId: string
 }): Promise<ActionResult<CancelOrderResult>> => {
+  const parsed = cancelOrderSchema.safeParse({ orderId, roomId })
+
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" }
+  }
+
   const user = await requireCurrentUser()
 
   if (!user) {
@@ -39,7 +51,6 @@ export const cancelOrder = async ({
       o.size::float8 as size,
       o.leverage,
       o.trigger_price::float8 as trigger_price,
-      o.reduce_only,
       o.status,
       o.margin_reserved::float8 as margin_reserved,
       o.created_at::text,
@@ -69,12 +80,18 @@ export const cancelOrder = async ({
     return { ok: false, error: "Order is no longer pending" }
   }
 
-  await sql`
+  const cancelledRows = (await sql`
     update orders
     set status = 'CANCELLED',
         cancelled_at = now()
     where id = ${order.id}
-  `
+      and status = 'PENDING'
+    returning id::text
+  `) as { id: string }[]
+
+  if (!cancelledRows[0]) {
+    return { ok: false, error: "Order is no longer pending" }
+  }
 
   let nextAvailableMargin = order.room_participants.available_margin
 
@@ -87,7 +104,8 @@ export const cancelOrder = async ({
     `
   }
 
-  revalidatePath(`/room/${roomId}/trade`)
+  const authorizedRoomId = order.room_participants.room_id
+  revalidatePath(`/room/${authorizedRoomId}/trade`)
   return {
     ok: true,
     data: {

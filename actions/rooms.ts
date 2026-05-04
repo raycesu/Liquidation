@@ -110,3 +110,18 @@ export const joinRoom = async (roomId: string): Promise<ActionResult<{ roomId: s
   revalidatePath(`/room/${room.id}`)
   return { ok: true, data: { roomId: room.id } }
 }
+
+export const joinRoomAction = async (formData: FormData): Promise<void> => {
+  const roomId = String(formData.get("roomId") ?? "")
+  const parsedRoomId = z.string().uuid().safeParse(roomId)
+
+  if (!parsedRoomId.success) {
+    redirect("/dashboard")
+  }
+
+  const result = await joinRoom(parsedRoomId.data)
+  if (result.ok) {
+    redirect(`/room/${result.data.roomId}`)
+  }
+  redirect(`/join/${parsedRoomId.data}?error=${encodeURIComponent(result.error)}`)
+}

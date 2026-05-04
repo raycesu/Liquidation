@@ -88,6 +88,12 @@ export const useBinanceTicker = () => {
 
   useEffect(() => {
     let cancelled = false
+    let binanceSocket: WebSocket | null = null
+    let hlSocket: WebSocket | null = null
+    let binanceRetryMs = 1000
+    let hlRetryMs = 1000
+    let binanceReconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let hlReconnectTimer: ReturnType<typeof setTimeout> | null = null
     const binanceRev = binanceSymbolToCanonical()
 
     const loadRestSnapshot = async () => {
@@ -165,17 +171,7 @@ export const useBinanceTicker = () => {
 
     void loadRestSnapshot()
 
-    const binanceSocket = new WebSocket("wss://fstream.binance.com/ws/!miniTicker@arr")
-
-    binanceSocket.addEventListener("open", () => {
-      setIsConnected(true)
-    })
-
-    binanceSocket.addEventListener("close", () => {
-      setIsConnected(false)
-    })
-
-    binanceSocket.addEventListener("message", (event: MessageEvent<string>) => {
+    const handleBinanceMessage = (event: MessageEvent<string>) => {
       let payload: FuturesMiniTickerWs[]
 
       try {
@@ -214,20 +210,9 @@ export const useBinanceTicker = () => {
 
       setPrices((current) => ({ ...current, ...nextPrices }))
       setStatsBySymbol((current) => ({ ...current, ...nextStats }))
-    })
+    }
 
-    const hlSocket = new WebSocket("wss://api.hyperliquid.xyz/ws")
-
-    hlSocket.addEventListener("open", () => {
-      hlSocket.send(
-        JSON.stringify({
-          method: "subscribe",
-          subscription: { type: "allMids", dex: "xyz" },
-        }),
-      )
-    })
-
-    hlSocket.addEventListener("message", (event: MessageEvent<string>) => {
+    const handleHlMessage = (event: MessageEvent<string>) => {
       let msg: unknown
 
       try {
@@ -283,12 +268,67 @@ export const useBinanceTicker = () => {
       if (Object.keys(nextPrices).length > 0) {
         setPrices((current) => ({ ...current, ...nextPrices }))
       }
-    })
+    }
+
+    const connectBinance = () => {
+      if (cancelled) {
+        return
+      }
+
+      binanceSocket = new WebSocket("wss://fstream.binance.com/ws/!miniTicker@arr")
+      binanceSocket.addEventListener("open", () => {
+        binanceRetryMs = 1000
+        setIsConnected(true)
+      })
+      binanceSocket.addEventListener("close", () => {
+        setIsConnected(false)
+        if (cancelled) {
+          return
+        }
+        binanceReconnectTimer = setTimeout(connectBinance, binanceRetryMs)
+        binanceRetryMs = Math.min(binanceRetryMs * 2, 10000)
+      })
+      binanceSocket.addEventListener("message", handleBinanceMessage)
+    }
+
+    const connectHyperliquid = () => {
+      if (cancelled) {
+        return
+      }
+
+      hlSocket = new WebSocket("wss://api.hyperliquid.xyz/ws")
+      hlSocket.addEventListener("open", () => {
+        hlRetryMs = 1000
+        hlSocket?.send(
+        JSON.stringify({
+          method: "subscribe",
+          subscription: { type: "allMids", dex: "xyz" },
+        }),
+      )
+      })
+      hlSocket.addEventListener("close", () => {
+        if (cancelled) {
+          return
+        }
+        hlReconnectTimer = setTimeout(connectHyperliquid, hlRetryMs)
+        hlRetryMs = Math.min(hlRetryMs * 2, 10000)
+      })
+      hlSocket.addEventListener("message", handleHlMessage)
+    }
+
+    connectBinance()
+    connectHyperliquid()
 
     return () => {
       cancelled = true
-      binanceSocket.close()
-      hlSocket.close()
+      if (binanceReconnectTimer) {
+        clearTimeout(binanceReconnectTimer)
+      }
+      if (hlReconnectTimer) {
+        clearTimeout(hlReconnectTimer)
+      }
+      binanceSocket?.close()
+      hlSocket?.close()
     }
   }, [])
 

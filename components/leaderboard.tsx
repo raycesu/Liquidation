@@ -9,7 +9,7 @@ type LeaderboardProps = {
 }
 
 export const Leaderboard = ({ participants }: LeaderboardProps) => {
-  const rankedParticipants = [...participants].sort((a, b) => b.total_equity - a.total_equity)
+  const rankedParticipants = [...participants].sort((a, b) => b.available_margin - a.available_margin)
 
   return (
     <Card className="border-border bg-surface">
@@ -22,7 +22,7 @@ export const Leaderboard = ({ participants }: LeaderboardProps) => {
             <TableRow>
               <TableHead>Rank</TableHead>
               <TableHead>Trader</TableHead>
-              <TableHead>Total equity</TableHead>
+              <TableHead>Live equity</TableHead>
               <TableHead>Available margin</TableHead>
             </TableRow>
           </TableHeader>
@@ -37,7 +37,7 @@ export const Leaderboard = ({ participants }: LeaderboardProps) => {
                 <TableCell className="font-medium text-text-primary">
                   {participant.users?.username ?? "Anonymous"}
                 </TableCell>
-                <TableCell className="font-mono">{formatUsd(participant.total_equity)}</TableCell>
+                <TableCell className="font-mono">{formatUsd(participant.available_margin)}</TableCell>
                 <TableCell className="font-mono">{formatUsd(participant.available_margin)}</TableCell>
               </TableRow>
             ))}

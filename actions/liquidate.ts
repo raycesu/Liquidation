@@ -1,5 +1,7 @@
 "use server"
 
+import { z } from "zod"
+import { requireCurrentUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { fetchMarketPrices } from "@/lib/pricing"
 import type { ActionResult, Position, SupportedSymbol } from "@/lib/types"
@@ -21,6 +23,35 @@ const isUnderwater = (position: Position, livePrice: number) => {
 }
 
 export const liquidateRoom = async (roomId: string): Promise<ActionResult<{ liquidated: number }>> => {
+  const parsed = z.string().uuid().safeParse(roomId)
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid room" }
+  }
+
+  const user = await requireCurrentUser()
+  if (!user) {
+    return { ok: false, error: "You must be signed in" }
+  }
+
+  const sql = getSql()
+  const membershipRows = (await sql`
+    select id::text
+    from room_participants
+    where room_id = ${roomId}
+      and user_id = ${user.id}
+    limit 1
+  `) as { id: string }[]
+
+  if (!membershipRows[0]) {
+    return { ok: false, error: "Forbidden" }
+  }
+
+  return runLiquidationEngineForRoom(roomId)
+}
+
+export const runLiquidationEngineForRoom = async (
+  roomId: string,
+): Promise<ActionResult<{ liquidated: number }>> => {
   const sql = getSql()
   const roomPositions = (await sql`
     select
@@ -83,17 +114,55 @@ export const liquidateRoom = async (roomId: string): Promise<ActionResult<{ liqu
       continue
     }
 
-    await sql`
+    const closedRows = (await sql`
       update positions
       set is_open = false,
           closed_at = now()
       where id = ${position.id}
+        and is_open = true
+      returning id::text
+    `) as { id: string }[]
+
+    if (!closedRows[0]) {
+      continue
+    }
+
+    await sql`
+      update orders
+      set status = 'CANCELLED',
+          cancelled_at = now()
+      where position_id = ${position.id}
+        and status = 'PENDING'
     `
 
     await sql`
       update room_participants
       set total_equity = ${position.room_participants.available_margin}
       where id = ${position.room_participants.id}
+    `
+
+    const tradeDirection = position.side === "LONG" ? "CLOSE_LONG" : "CLOSE_SHORT"
+    await sql`
+      insert into trades (
+        participant_id,
+        position_id,
+        symbol,
+        direction,
+        price,
+        size,
+        trade_value,
+        realized_pnl
+      )
+      values (
+        ${position.participant_id},
+        ${position.id},
+        ${position.symbol},
+        ${tradeDirection},
+        ${livePrice},
+        ${position.size},
+        ${position.size},
+        ${-position.margin_allocated}
+      )
     `
 
     liquidated += 1

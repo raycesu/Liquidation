@@ -65,7 +65,6 @@ export type PendingOrder = {
   size: number
   leverage: number
   trigger_price: number
-  reduce_only: boolean
   status: OrderStatus
   margin_reserved: number
   created_at: string
@@ -89,7 +88,7 @@ export type Trade = {
 }
 
 export type ParticipantWithUser = RoomParticipant & {
-  users: Pick<UserProfile, "id" | "username" | "email"> | null
+  users: Pick<UserProfile, "id" | "username"> | null
 }
 
 export type ActionResult<T = undefined> =

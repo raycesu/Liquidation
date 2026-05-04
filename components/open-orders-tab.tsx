@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import { cancelOrder } from "@/actions/cancel-order"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { formatNumber, formatUsd } from "@/lib/format"
+import { formatDateTime, formatNumber, formatUsd } from "@/lib/format"
 import type { CancelOrderResult } from "@/actions/cancel-order"
 import type { PendingOrder } from "@/lib/types"
 
@@ -19,23 +19,6 @@ const orderTypeLabel: Record<PendingOrder["type"], string> = {
   LIMIT: "Limit",
   TAKE_PROFIT: "Take Profit",
   STOP_LOSS: "Stop Loss",
-}
-
-const formatTime = (iso: string) => {
-  const date = new Date(iso)
-
-  if (Number.isNaN(date.getTime())) {
-    return iso
-  }
-
-  return date.toLocaleString(undefined, {
-    month: "numeric",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
 }
 
 const getTriggerConditionLabel = (order: PendingOrder) => {
@@ -112,7 +95,9 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
 
             return (
               <TableRow key={order.id}>
-                <TableCell className="font-mono text-xs text-text-secondary">{formatTime(order.created_at)}</TableCell>
+                <TableCell className="font-mono text-xs text-text-secondary">
+                  {formatDateTime(order.created_at)}
+                </TableCell>
                 <TableCell>{orderTypeLabel[order.type]}</TableCell>
                 <TableCell className="font-mono font-semibold text-text-primary">
                   {order.symbol.replace("USDT", "")}

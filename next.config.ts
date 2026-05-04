@@ -1,6 +1,20 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/apple-touch-icon.png",
+        destination: "/images/liquidation-logo.png",
+        permanent: false,
+      },
+      {
+        source: "/apple-touch-icon-precomposed.png",
+        destination: "/images/liquidation-logo.png",
+        permanent: false,
+      },
+    ]
+  },
   images: {
     remotePatterns: [
       {

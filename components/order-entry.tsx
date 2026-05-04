@@ -257,7 +257,6 @@ export const OrderEntry = ({
           leverage,
           size: numericSize,
           limitPrice: numericLimitPrice,
-          reduceOnly: false,
         })
 
         if (!result.ok) {

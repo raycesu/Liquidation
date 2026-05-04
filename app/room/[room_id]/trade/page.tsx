@@ -71,7 +71,6 @@ export default async function TradePage({ params }: TradePageProps) {
       size::float8 as size,
       leverage,
       trigger_price::float8 as trigger_price,
-      reduce_only,
       status,
       margin_reserved::float8 as margin_reserved,
       created_at::text,

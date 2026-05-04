@@ -1,7 +1,7 @@
 "use client"
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { formatNumber, formatUsd } from "@/lib/format"
+import { formatDateTime, formatNumber, formatUsd } from "@/lib/format"
 import type { Trade, TradeDirection } from "@/lib/types"
 
 type TradeHistoryTabProps = {
@@ -20,23 +20,6 @@ const directionClassName: Record<TradeDirection, string> = {
   OPEN_SHORT: "text-loss",
   CLOSE_LONG: "text-loss",
   CLOSE_SHORT: "text-profit",
-}
-
-const formatTime = (iso: string) => {
-  const date = new Date(iso)
-
-  if (Number.isNaN(date.getTime())) {
-    return iso
-  }
-
-  return date.toLocaleString(undefined, {
-    month: "numeric",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
 }
 
 export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
@@ -63,7 +46,9 @@ export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
 
             return (
               <TableRow key={trade.id}>
-                <TableCell className="font-mono text-xs text-text-secondary">{formatTime(trade.created_at)}</TableCell>
+                <TableCell className="font-mono text-xs text-text-secondary">
+                  {formatDateTime(trade.created_at)}
+                </TableCell>
                 <TableCell className="font-mono font-semibold text-text-primary">
                   {trade.symbol.replace("USDT", "")}
                 </TableCell>

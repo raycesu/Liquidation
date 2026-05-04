@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requireCurrentUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
-import type { ActionResult, PendingOrder, Position, PositionSide } from "@/lib/types"
+import { getTriggerSide } from "@/lib/trading-rules"
+import type { ActionResult, PendingOrder, Position } from "@/lib/types"
 
 const setTriggersSchema = z.object({
   positionId: z.string().uuid(),
@@ -100,7 +101,7 @@ export const setPositionTriggers = async (
       and type in ('TAKE_PROFIT', 'STOP_LOSS')
   `
 
-  const triggerSide: PositionSide = position.side === "LONG" ? "SHORT" : "LONG"
+  const triggerSide = getTriggerSide(position.side)
   const triggers: PendingOrder[] = []
 
   if (parsed.data.takeProfitPrice != null) {
@@ -114,7 +115,6 @@ export const setPositionTriggers = async (
         size,
         leverage,
         trigger_price,
-        reduce_only,
         status,
         margin_reserved
       )
@@ -127,7 +127,6 @@ export const setPositionTriggers = async (
         ${position.size},
         ${position.leverage},
         ${parsed.data.takeProfitPrice},
-        true,
         'PENDING',
         0
       )
@@ -141,7 +140,6 @@ export const setPositionTriggers = async (
         size::float8 as size,
         leverage,
         trigger_price::float8 as trigger_price,
-        reduce_only,
         status,
         margin_reserved::float8 as margin_reserved,
         created_at::text,
@@ -165,7 +163,6 @@ export const setPositionTriggers = async (
         size,
         leverage,
         trigger_price,
-        reduce_only,
         status,
         margin_reserved
       )
@@ -178,7 +175,6 @@ export const setPositionTriggers = async (
         ${position.size},
         ${position.leverage},
         ${parsed.data.stopLossPrice},
-        true,
         'PENDING',
         0
       )
@@ -192,7 +188,6 @@ export const setPositionTriggers = async (
         size::float8 as size,
         leverage,
         trigger_price::float8 as trigger_price,
-        reduce_only,
         status,
         margin_reserved::float8 as margin_reserved,
         created_at::text,
