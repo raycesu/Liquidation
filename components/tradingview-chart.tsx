@@ -70,7 +70,7 @@ export const TradingViewChart = ({ symbol }: TradingViewChartProps) => {
       parent.innerHTML = ""
       const mount = document.createElement("div")
       mount.id = containerId
-      mount.className = "h-full min-h-[520px] w-full"
+      mount.className = "h-full w-full"
       parent.appendChild(mount)
 
       const tvSymbol = getMarket(symbol)?.tvSymbol ?? "BINANCE:BTCUSDT.P"
@@ -83,12 +83,39 @@ export const TradingViewChart = ({ symbol }: TradingViewChartProps) => {
         theme: "dark",
         style: "1",
         locale: "en",
+        toolbar_bg: "#0b2038",
+        backgroundColor: "#07172a",
+        custom_font_family: "Geist, ui-sans-serif, system-ui, sans-serif",
         enable_publishing: false,
         allow_symbol_change: false,
         container_id: containerId,
         hide_top_toolbar: false,
         hide_legend: false,
         hide_side_toolbar: false,
+        overrides: {
+          "paneProperties.background": "#07172a",
+          "paneProperties.backgroundType": "solid",
+          "paneProperties.vertGridProperties.color": "#12365a",
+          "paneProperties.horzGridProperties.color": "#12365a",
+          "paneProperties.crossHairProperties.color": "#17c9ff",
+          "paneProperties.separatorColor": "#173a60",
+          "scalesProperties.lineColor": "#173a60",
+          "scalesProperties.textColor": "#8ab0d4",
+          "mainSeriesProperties.candleStyle.upColor": "#00c97a",
+          "mainSeriesProperties.candleStyle.downColor": "#ff3b5c",
+          "mainSeriesProperties.candleStyle.borderUpColor": "#00c97a",
+          "mainSeriesProperties.candleStyle.borderDownColor": "#ff3b5c",
+          "mainSeriesProperties.candleStyle.wickUpColor": "#00c97a",
+          "mainSeriesProperties.candleStyle.wickDownColor": "#ff3b5c",
+        },
+        settings_overrides: {
+          "paneProperties.background": "#07172a",
+          "paneProperties.backgroundType": "solid",
+          "paneProperties.vertGridProperties.color": "#12365a",
+          "paneProperties.horzGridProperties.color": "#12365a",
+          "scalesProperties.lineColor": "#173a60",
+          "scalesProperties.textColor": "#8ab0d4",
+        },
       })
 
       widgetRef.current = widget
@@ -120,11 +147,10 @@ export const TradingViewChart = ({ symbol }: TradingViewChartProps) => {
   }, [symbol, containerId])
 
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs font-medium uppercase tracking-[0.25em] text-accent-neon">Liquidation</p>
+    <div className="overflow-hidden rounded-2xl border border-border/70 bg-surface/80 shadow-2xl shadow-accent-blue/10 backdrop-blur">
       <div
         ref={containerRef}
-        className="min-h-[520px] w-full overflow-hidden rounded-xl border border-border bg-surface"
+        className="h-[clamp(360px,calc(100vh_-_17rem),640px)] w-full overflow-hidden bg-surface lg:h-[clamp(440px,calc(100vh_-_16.5rem),660px)]"
         role="region"
         aria-label="TradingView price chart"
       />

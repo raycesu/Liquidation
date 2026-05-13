@@ -71,9 +71,9 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
+    <Table className="text-xs [&_td]:px-3 [&_td]:py-2.5">
+      <TableHeader className="[&_tr]:border-border/50 [&_th]:h-9 [&_th]:px-3 [&_th]:text-[10px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.14em] [&_th]:text-text-secondary">
+        <TableRow className="hover:bg-transparent">
           <TableHead>Time</TableHead>
           <TableHead>Type</TableHead>
           <TableHead>Coin</TableHead>
@@ -94,7 +94,7 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
             const groupedTriggers = order.position_id ? triggerByPositionId[order.position_id] : null
 
             return (
-              <TableRow key={order.id}>
+              <TableRow key={order.id} className="border-border/40 hover:bg-surface-elevated/30">
                 <TableCell className="font-mono text-xs text-text-secondary">
                   {formatDateTime(order.created_at)}
                 </TableCell>
@@ -134,8 +134,8 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
             )
           })
         ) : (
-          <TableRow>
-            <TableCell colSpan={11} className="h-28 text-center text-text-secondary">
+          <TableRow className="border-border/40 hover:bg-transparent">
+            <TableCell colSpan={11} className="h-24 text-center text-text-secondary">
               No open orders
             </TableCell>
           </TableRow>

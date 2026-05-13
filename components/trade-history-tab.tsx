@@ -24,9 +24,9 @@ const directionClassName: Record<TradeDirection, string> = {
 
 export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
+    <Table className="text-xs [&_td]:px-3 [&_td]:py-2.5">
+      <TableHeader className="[&_tr]:border-border/50 [&_th]:h-9 [&_th]:px-3 [&_th]:text-[10px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.14em] [&_th]:text-text-secondary">
+        <TableRow className="hover:bg-transparent">
           <TableHead>Time</TableHead>
           <TableHead>Coin</TableHead>
           <TableHead>Direction</TableHead>
@@ -45,7 +45,7 @@ export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
             const pnlClassName = realizedPnl >= 0 ? "text-profit" : "text-loss"
 
             return (
-              <TableRow key={trade.id}>
+              <TableRow key={trade.id} className="border-border/40 hover:bg-surface-elevated/30">
                 <TableCell className="font-mono text-xs text-text-secondary">
                   {formatDateTime(trade.created_at)}
                 </TableCell>
@@ -65,8 +65,8 @@ export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
             )
           })
         ) : (
-          <TableRow>
-            <TableCell colSpan={7} className="h-28 text-center text-text-secondary">
+          <TableRow className="border-border/40 hover:bg-transparent">
+            <TableCell colSpan={7} className="h-24 text-center text-text-secondary">
               No trades yet
             </TableCell>
           </TableRow>

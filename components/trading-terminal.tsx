@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { OrderEntry } from "@/components/order-entry"
 import { PositionsPanel } from "@/components/positions-panel"
 import { TradingViewChart } from "@/components/tradingview-chart"
@@ -27,6 +27,21 @@ type TradingTerminalProps = {
   initialTrades: Trade[]
 }
 
+type MarketMetricProps = {
+  label: string
+  value: ReactNode
+  valueClassName?: string
+}
+
+const MarketMetric = ({ label, value, valueClassName }: MarketMetricProps) => {
+  return (
+    <div className="min-w-[7.5rem] rounded-lg border border-border/70 bg-surface-elevated/70 px-2.5 py-1.5 shadow-lg shadow-accent-blue/5">
+      <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-text-secondary">{label}</p>
+      <p className={cn("mt-0.5 font-mono text-xs text-text-primary", valueClassName)}>{value}</p>
+    </div>
+  )
+}
+
 export const TradingTerminal = ({
   roomId,
   participantId,
@@ -43,6 +58,8 @@ export const TradingTerminal = ({
   const { prices, statsBySymbol, isConnected } = useBinanceTicker()
   const selectedPrice = prices[symbol]
   const selectedStats = statsBySymbol[symbol]
+  const selectedMarket = getMarket(symbol)
+  const marketDisplayName = selectedMarket?.displayName ?? symbol
 
   const openPositions = useMemo(() => positions.filter((position) => position.is_open), [positions])
   const activePendingOrders = useMemo(
@@ -136,59 +153,65 @@ export const TradingTerminal = ({
       : `${selectedStats.changeAbs >= 0 ? "+" : ""}${formatNumber(selectedStats.changeAbs)} / ${selectedStats.changePercent >= 0 ? "+" : ""}${formatPercent(selectedStats.changePercent)}`
 
   return (
-    <main className="min-h-screen bg-background px-4 py-6">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
-        <header className="flex flex-col gap-3">
-          <div>
-            <p className="text-sm uppercase tracking-[0.35em] text-accent-neon">Trading terminal</p>
-            <div className="mt-2 flex items-center gap-3">
-              <h1 className="text-3xl font-semibold text-text-primary">
-                {getMarket(symbol)?.displayName ?? symbol} Perp
-              </h1>
-              <Badge className={isConnected ? "bg-profit/10 text-profit" : "bg-loss/10 text-loss"}>
-                {isConnected ? "Live" : "Connecting"}
-              </Badge>
+    <main className="relative min-h-screen overflow-hidden bg-background px-2 py-2 sm:px-3 sm:py-3">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(23,201,255,0.16),transparent_32%),radial-gradient(circle_at_top_right,rgba(10,140,255,0.13),transparent_30%),linear-gradient(180deg,rgba(7,23,42,0.92)_0%,rgba(3,9,20,1)_62%)]"
+        aria-hidden
+      />
+      <div className="relative mx-auto flex w-full max-w-[1600px] flex-col gap-3">
+        <header className="rounded-xl border border-border/70 bg-surface/80 p-3 shadow-2xl shadow-accent-blue/10 backdrop-blur">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="bg-gradient-to-r from-accent-neon via-primary to-text-primary bg-clip-text font-heading text-[10px] font-semibold uppercase tracking-[0.28em] text-transparent">
+                Trading Terminal
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <h1 className="font-heading text-2xl font-semibold tracking-[-0.03em] text-text-primary sm:text-3xl">
+                  {marketDisplayName} Perp
+                </h1>
+                <Badge
+                  className={cn(
+                    "border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em]",
+                    isConnected
+                      ? "border-profit/30 bg-profit/10 text-profit hover:bg-profit/10"
+                      : "border-loss/30 bg-loss/10 text-loss hover:bg-loss/10",
+                  )}
+                >
+                  {isConnected ? "Live" : "Connecting"}
+                </Badge>
+              </div>
             </div>
+
+            <Button
+              asChild
+              variant="outline"
+              className="h-9 w-fit border-border/70 bg-surface-elevated/70 px-3 text-sm text-text-primary shadow-lg shadow-accent-blue/5 hover:border-accent-neon/60 hover:bg-surface-elevated"
+            >
+              <Link href={`/room/${roomId}`}>Lobby</Link>
+            </Button>
           </div>
 
           <div
-            className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-border pb-4"
+            className="mt-3 flex flex-wrap items-stretch gap-2 border-t border-border/60 pt-3"
             role="toolbar"
             aria-label="Market and symbol controls"
           >
             <AssetSelector value={symbol} onChange={setSymbol} prices={prices} statsBySymbol={statsBySymbol} />
 
-            <div className="hidden h-8 w-px bg-border sm:block" aria-hidden />
-
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-text-secondary">Mark</p>
-                <p className="font-mono text-base text-text-primary">
-                  {selectedPrice != null ? `$${formatNumber(selectedPrice)}` : "--"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-text-secondary">24h change</p>
-                <p className={cn("font-mono text-base", changeToneClass)}>{changeLabel}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-text-secondary">24h volume</p>
-                <p className="font-mono text-base text-text-primary">
-                  {selectedStats != null ? formatCompactUsd(selectedStats.quoteVolume) : "--"}
-                </p>
-              </div>
-            </div>
-
-            <div className="ml-auto flex shrink-0 items-center">
-              <Button asChild variant="outline">
-                <Link href={`/room/${roomId}`}>Lobby</Link>
-              </Button>
-            </div>
+            <MarketMetric
+              label="Mark"
+              value={selectedPrice != null ? `$${formatNumber(selectedPrice)}` : "--"}
+            />
+            <MarketMetric label="24h Change" value={changeLabel} valueClassName={changeToneClass} />
+            <MarketMetric
+              label="24h Volume"
+              value={selectedStats != null ? formatCompactUsd(selectedStats.quoteVolume) : "--"}
+            />
           </div>
         </header>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,1fr)]">
-          <div className="flex min-w-0 flex-col gap-4">
+        <section className="grid gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(360px,1fr)]">
+          <div className="flex min-w-0 flex-col gap-3">
             <TradingViewChart symbol={symbol} />
             <PositionsPanel
               roomId={roomId}
@@ -201,7 +224,7 @@ export const TradingTerminal = ({
               onOrderCancelled={handleOrderCancelled}
             />
           </div>
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <OrderEntry
               key={symbol}
               participantId={participantId}

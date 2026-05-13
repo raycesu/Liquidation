@@ -115,9 +115,9 @@ export const PositionsTab = ({
 
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow>
+      <Table className="text-xs [&_td]:px-3 [&_td]:py-2.5">
+        <TableHeader className="[&_tr]:border-border/50 [&_th]:h-9 [&_th]:px-3 [&_th]:text-[10px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.14em] [&_th]:text-text-secondary">
+          <TableRow className="hover:bg-transparent">
             <TableHead>Coin</TableHead>
             <TableHead>Size</TableHead>
             <TableHead>Position Value</TableHead>
@@ -153,7 +153,7 @@ export const PositionsTab = ({
               const { tp, sl } = findTriggers(pendingOrders, position.id)
 
               return (
-                <TableRow key={position.id}>
+                <TableRow key={position.id} className="border-border/40 hover:bg-surface-elevated/30">
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-semibold text-text-primary">
@@ -198,8 +198,8 @@ export const PositionsTab = ({
               )
             })
           ) : (
-            <TableRow>
-              <TableCell colSpan={10} className="h-28 text-center text-text-secondary">
+            <TableRow className="border-border/40 hover:bg-transparent">
+              <TableCell colSpan={10} className="h-24 text-center text-text-secondary">
                 No open positions yet
               </TableCell>
             </TableRow>

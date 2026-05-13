@@ -1,6 +1,6 @@
 "use client"
 
-import { Search, Star } from "lucide-react"
+import { Search } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -100,15 +100,14 @@ export const AssetSelector = ({ value, onChange, prices, statsBySymbol }: AssetS
         <Button
           type="button"
           variant="outline"
-          className="h-auto min-w-[12rem] flex-col items-stretch gap-1 border-border px-3 py-2 text-left sm:flex-row sm:items-center sm:gap-3"
+          className="h-auto min-w-[12rem] flex-col items-stretch gap-1 border-border/70 bg-surface-elevated/70 px-3 py-2 text-left shadow-lg shadow-accent-blue/5 hover:border-accent-neon/60 hover:bg-surface-elevated sm:flex-row sm:items-center sm:gap-3"
           aria-label="Open asset picker"
           aria-haspopup="dialog"
         >
           <div className="flex items-center gap-2">
-            <Star className="size-4 shrink-0 text-text-secondary" aria-hidden />
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold text-text-primary">{selected?.displayName ?? value}</span>
-              <Badge variant="secondary" className="bg-blue-500/15 font-mono text-xs text-blue-300">
+              <Badge variant="secondary" className="bg-primary/15 font-mono text-xs text-accent-neon hover:bg-primary/15">
                 {getMaxLeverage(value)}x
               </Badge>
             </div>
@@ -118,8 +117,8 @@ export const AssetSelector = ({ value, onChange, prices, statsBySymbol }: AssetS
           </span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b border-border px-4 py-3 text-left">
+      <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col gap-0 overflow-hidden border-border/70 bg-surface/95 p-0 shadow-2xl shadow-accent-blue/15 sm:max-w-3xl">
+        <DialogHeader className="border-b border-border/60 bg-surface-elevated/35 px-4 py-3 text-left">
           <DialogTitle className="text-base font-semibold">Markets</DialogTitle>
           <DialogDescription className="sr-only">
             Search and pick a market. Table columns include price, 24 hour change, and volume.
@@ -138,13 +137,21 @@ export const AssetSelector = ({ value, onChange, prices, statsBySymbol }: AssetS
           </div>
           <Tabs value={tab} onValueChange={(v) => setTab(v as AssetTab)} className="gap-2">
             <TabsList variant="line" className="h-auto w-full flex-wrap justify-start gap-1">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="crypto">Crypto</TabsTrigger>
-              <TabsTrigger value="equity">Equities</TabsTrigger>
-              <TabsTrigger value="commodity">Commodities</TabsTrigger>
-              <TabsTrigger value="index">Indices</TabsTrigger>
+              <TabsTrigger value="all" className="data-active:text-accent-neon after:bg-accent-neon">All</TabsTrigger>
+              <TabsTrigger value="crypto" className="data-active:text-accent-neon after:bg-accent-neon">
+                Crypto
+              </TabsTrigger>
+              <TabsTrigger value="equity" className="data-active:text-accent-neon after:bg-accent-neon">
+                Equities
+              </TabsTrigger>
+              <TabsTrigger value="commodity" className="data-active:text-accent-neon after:bg-accent-neon">
+                Commodities
+              </TabsTrigger>
+              <TabsTrigger value="index" className="data-active:text-accent-neon after:bg-accent-neon">
+                Indices
+              </TabsTrigger>
             </TabsList>
-            <TabsContent value="all" className="mt-0 max-h-[55vh] overflow-auto rounded-md border border-border">
+            <TabsContent value="all" className="mt-0 max-h-[55vh] overflow-auto rounded-xl border border-border/70">
               <AssetTable
                 markets={rowSets.all}
                 activeSymbol={value}
@@ -153,7 +160,7 @@ export const AssetSelector = ({ value, onChange, prices, statsBySymbol }: AssetS
                 onSelect={handleSelect}
               />
             </TabsContent>
-            <TabsContent value="crypto" className="mt-0 max-h-[55vh] overflow-auto rounded-md border border-border">
+            <TabsContent value="crypto" className="mt-0 max-h-[55vh] overflow-auto rounded-xl border border-border/70">
               <AssetTable
                 markets={rowSets.crypto}
                 activeSymbol={value}
@@ -162,7 +169,7 @@ export const AssetSelector = ({ value, onChange, prices, statsBySymbol }: AssetS
                 onSelect={handleSelect}
               />
             </TabsContent>
-            <TabsContent value="equity" className="mt-0 max-h-[55vh] overflow-auto rounded-md border border-border">
+            <TabsContent value="equity" className="mt-0 max-h-[55vh] overflow-auto rounded-xl border border-border/70">
               <AssetTable
                 markets={rowSets.equity}
                 activeSymbol={value}
@@ -171,7 +178,7 @@ export const AssetSelector = ({ value, onChange, prices, statsBySymbol }: AssetS
                 onSelect={handleSelect}
               />
             </TabsContent>
-            <TabsContent value="commodity" className="mt-0 max-h-[55vh] overflow-auto rounded-md border border-border">
+            <TabsContent value="commodity" className="mt-0 max-h-[55vh] overflow-auto rounded-xl border border-border/70">
               <AssetTable
                 markets={rowSets.commodity}
                 activeSymbol={value}
@@ -180,7 +187,7 @@ export const AssetSelector = ({ value, onChange, prices, statsBySymbol }: AssetS
                 onSelect={handleSelect}
               />
             </TabsContent>
-            <TabsContent value="index" className="mt-0 max-h-[55vh] overflow-auto rounded-md border border-border">
+            <TabsContent value="index" className="mt-0 max-h-[55vh] overflow-auto rounded-xl border border-border/70">
               <AssetTable
                 markets={rowSets.index}
                 activeSymbol={value}
@@ -213,9 +220,8 @@ const AssetTable = ({ markets, activeSymbol, prices, statsBySymbol, onSelect }: 
 
   return (
     <Table>
-      <TableHeader className="sticky top-0 z-10 bg-surface">
+      <TableHeader className="sticky top-0 z-10 bg-surface [&_tr]:border-border/60 [&_th]:text-[11px] [&_th]:uppercase [&_th]:tracking-[0.12em] [&_th]:text-text-secondary">
         <TableRow className="hover:bg-transparent">
-          <TableHead className="w-10 text-text-secondary" aria-label="Watchlist" />
           <TableHead className="text-text-secondary">Asset</TableHead>
           <TableHead className="text-right text-text-secondary">Price</TableHead>
           <TableHead className="text-right text-text-secondary">24h change</TableHead>
@@ -239,9 +245,9 @@ const AssetTable = ({ markets, activeSymbol, prices, statsBySymbol, onSelect }: 
               key={m.symbol}
               data-state={isActive ? "selected" : undefined}
               className={cn(
-                "cursor-pointer border-border",
+                "cursor-pointer border-border/50",
                 isActive && "bg-surface-elevated/80",
-                !isActive && "hover:bg-muted/40",
+                !isActive && "hover:bg-surface-elevated/40",
               )}
               role="button"
               tabIndex={0}
@@ -255,9 +261,6 @@ const AssetTable = ({ markets, activeSymbol, prices, statsBySymbol, onSelect }: 
                 }
               }}
             >
-              <TableCell className="w-10">
-                <Star className="size-4 text-text-secondary" aria-hidden />
-              </TableCell>
               <TableCell>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-text-primary">{m.displayName}</span>

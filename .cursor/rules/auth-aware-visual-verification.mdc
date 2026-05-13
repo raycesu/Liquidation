@@ -1,0 +1,12 @@
+---
+description: Avoid Playwright visual inspection on auth-protected routes without an active session
+alwaysApply: true
+---
+
+# Auth-Aware Visual Verification
+
+- This project uses Clerk auth. Routes that require sign-in, including trading terminal, dashboard, room, profile, and join flows, are auth-blocked for fresh agent Playwright sessions.
+- Do not repeatedly try Playwright visual inspection for authenticated pages unless the user explicitly provides a signed-in browser/session path or asks to debug auth.
+- Public routes such as the home page can still be inspected with Playwright when useful.
+- For protected UI work, verify with code review, linting, typecheck, and component-level reasoning. In the final response, clearly state that live visual inspection of protected routes was skipped because authentication blocks the agent session.
+- If visual verification is essential, ask the user to either inspect it in their signed-in browser or provide a route/session setup that the agent can access.

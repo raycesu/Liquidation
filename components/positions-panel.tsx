@@ -33,15 +33,21 @@ export const PositionsPanel = ({
   onOrderCancelled,
 }: PositionsPanelProps) => {
   return (
-    <Card className="border-border bg-surface">
+    <Card className="border-border/70 bg-surface/80 shadow-2xl shadow-accent-blue/10 backdrop-blur">
       <CardContent className="p-0">
         <Tabs defaultValue="positions" className="gap-0">
-          <TabsList variant="line" className="border-b border-border px-4 pt-3">
-            <TabsTrigger value="positions">Positions ({positions.length})</TabsTrigger>
-            <TabsTrigger value="open-orders">Open Orders ({pendingOrders.length})</TabsTrigger>
-            <TabsTrigger value="trade-history">Trade History</TabsTrigger>
+          <TabsList variant="line" className="h-11 w-full justify-start gap-8 border-b border-border/60 bg-surface-elevated/25 px-4 pt-0">
+            <TabsTrigger value="positions" className="flex-none rounded-none px-0 py-2 text-xs font-semibold uppercase tracking-[0.18em] data-active:text-accent-neon after:bg-accent-neon">
+              Positions
+            </TabsTrigger>
+            <TabsTrigger value="open-orders" className="flex-none rounded-none px-0 py-2 text-xs font-semibold uppercase tracking-[0.18em] data-active:text-accent-neon after:bg-accent-neon">
+              Open Orders
+            </TabsTrigger>
+            <TabsTrigger value="trade-history" className="flex-none rounded-none px-0 py-2 text-xs font-semibold uppercase tracking-[0.18em] data-active:text-accent-neon after:bg-accent-neon">
+              Trade History
+            </TabsTrigger>
           </TabsList>
-          <TabsContent value="positions" className="overflow-x-auto px-2 pb-2">
+          <TabsContent value="positions" className="overflow-x-auto px-2 pb-2 pt-0">
             <PositionsTab
               roomId={roomId}
               positions={positions}
@@ -51,10 +57,10 @@ export const PositionsPanel = ({
               onTriggersUpdated={onTriggersUpdated}
             />
           </TabsContent>
-          <TabsContent value="open-orders" className="overflow-x-auto px-2 pb-2">
+          <TabsContent value="open-orders" className="overflow-x-auto px-2 pb-2 pt-0">
             <OpenOrdersTab roomId={roomId} orders={pendingOrders} onOrderCancelled={onOrderCancelled} />
           </TabsContent>
-          <TabsContent value="trade-history" className="overflow-x-auto px-2 pb-2">
+          <TabsContent value="trade-history" className="overflow-x-auto px-2 pb-2 pt-0">
             <TradeHistoryTab trades={trades} />
           </TabsContent>
         </Tabs>

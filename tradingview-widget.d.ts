@@ -1,5 +1,7 @@
 /** Minimal typings for TradingView embed script (https://s3.tradingview.com/tv.js). */
 
+type TradingViewPrimitiveOption = string | number | boolean
+
 type TradingViewWidgetOptions = {
   autosize?: boolean
   symbol: string
@@ -8,6 +10,9 @@ type TradingViewWidgetOptions = {
   theme?: "light" | "dark"
   style?: string
   locale?: string
+  toolbar_bg?: string
+  backgroundColor?: string
+  custom_font_family?: string
   enable_publishing?: boolean
   allow_symbol_change?: boolean
   container_id: string
@@ -16,6 +21,8 @@ type TradingViewWidgetOptions = {
   hide_side_toolbar?: boolean
   save_image?: boolean
   studies?: string[]
+  overrides?: Record<string, TradingViewPrimitiveOption>
+  settings_overrides?: Record<string, TradingViewPrimitiveOption>
   width?: number | string
   height?: number | string
 }
