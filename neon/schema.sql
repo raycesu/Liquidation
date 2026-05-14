@@ -4,6 +4,7 @@ create table if not exists public.users (
   id text primary key,
   email text not null,
   username text not null,
+  image_url text,
   created_at timestamptz not null default now()
 );
 
@@ -11,6 +12,7 @@ create table if not exists public.rooms (
   id uuid primary key default gen_random_uuid(),
   creator_id text not null references public.users(id) on delete cascade,
   name text not null,
+  join_code text not null check (join_code ~ '^[A-Z0-9]{6}$'),
   starting_balance numeric not null default 10000 check (starting_balance > 0),
   start_date timestamptz not null default now(),
   end_date timestamptz not null,
@@ -80,6 +82,7 @@ create table if not exists public.trades (
 );
 
 create index if not exists rooms_creator_id_idx on public.rooms (creator_id);
+create unique index if not exists rooms_join_code_unique_idx on public.rooms (join_code);
 create unique index if not exists users_username_lower_unique_idx on public.users (lower(username));
 create index if not exists room_participants_user_id_idx on public.room_participants (user_id);
 create index if not exists room_participants_room_id_idx on public.room_participants (room_id);

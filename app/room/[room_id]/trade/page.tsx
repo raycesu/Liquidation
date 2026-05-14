@@ -37,7 +37,7 @@ export default async function TradePage({ params }: TradePageProps) {
   const participant = participantRows[0]
 
   if (!participant) {
-    redirect(`/join/${roomId}`)
+    redirect("/dashboard")
   }
 
   const positions = (await sql`

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { CreateRoomDialog } from "@/components/create-room-dialog"
+import { JoinRoomDialog } from "@/components/join-room-dialog"
 import { RoomCard } from "@/components/room-card"
 import { SignOutButton } from "@/components/sign-out-button"
 import { requireCurrentUser } from "@/lib/auth"
@@ -36,6 +37,7 @@ export default async function DashboardPage() {
         'id', r.id::text,
         'creator_id', r.creator_id,
         'name', r.name,
+        'join_code', r.join_code,
         'starting_balance', r.starting_balance::float8,
         'start_date', r.start_date::text,
         'end_date', r.end_date::text,
@@ -73,6 +75,7 @@ export default async function DashboardPage() {
             <Button asChild variant="secondary">
               <Link href="/dashboard/profile">Profile</Link>
             </Button>
+            <JoinRoomDialog />
             <CreateRoomDialog />
             <SignOutButton />
           </div>
@@ -95,9 +98,10 @@ export default async function DashboardPage() {
           <section className="rounded-xl border border-dashed border-border bg-surface p-10 text-center">
             <h2 className="text-2xl font-semibold text-text-primary">No rooms yet</h2>
             <p className="mx-auto mt-2 max-w-xl text-text-secondary">
-              Start a competition room to generate a shareable join link and begin paper trading.
+              Start a competition room or enter a shared room code to begin paper trading.
             </p>
-            <div className="mt-6">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <JoinRoomDialog />
               <CreateRoomDialog />
             </div>
           </section>

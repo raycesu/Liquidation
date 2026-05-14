@@ -35,6 +35,7 @@ describe("updateProfile", () => {
       id: "user_1",
       email: "trader@example.com",
       username: "rayce",
+      image_url: null,
       created_at: new Date().toISOString(),
     })
 

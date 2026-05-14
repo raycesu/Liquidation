@@ -13,9 +13,35 @@ const createRoomSchema = z.object({
   endDate: z.string().min(1, "Choose an end date"),
 })
 
+const joinCodeSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.toUpperCase())
+  .refine((value) => /^[A-Z0-9]{6}$/.test(value), "Enter a valid 6-character room code")
+
+const ROOM_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+const ROOM_CODE_LENGTH = 6
+const ROOM_CODE_MAX_ATTEMPTS = 8
+
 type CreateRoomData = {
   roomId: string
 }
+
+type JoinRoomData = {
+  roomId: string
+}
+
+const generateJoinCode = () =>
+  Array.from({ length: ROOM_CODE_LENGTH }, () => {
+    const index = Math.floor(Math.random() * ROOM_CODE_ALPHABET.length)
+    return ROOM_CODE_ALPHABET.charAt(index)
+  }).join("")
+
+const isUniqueViolation = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  (error as { code?: unknown }).code === "23505"
 
 export const createRoom = async (
   _previousState: ActionResult<CreateRoomData>,
@@ -44,20 +70,35 @@ export const createRoom = async (
   }
 
   const sql = getSql()
-  const rooms = (await sql`
-    insert into rooms (creator_id, name, starting_balance, start_date, end_date, is_active)
-    values (${user.id}, ${parsed.data.name}, ${parsed.data.startingBalance}, now(), ${endDate.toISOString()}, true)
-    returning
-      id::text,
-      creator_id,
-      name,
-      starting_balance::float8 as starting_balance,
-      start_date::text,
-      end_date::text,
-      is_active,
-      created_at::text
-  `) as Room[]
-  const room = rooms[0]
+  let room: Room | null = null
+
+  for (let attempt = 0; attempt < ROOM_CODE_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const joinCode = generateJoinCode()
+      const rooms = (await sql`
+        insert into rooms (creator_id, name, join_code, starting_balance, start_date, end_date, is_active)
+        values (${user.id}, ${parsed.data.name}, ${joinCode}, ${parsed.data.startingBalance}, now(), ${endDate.toISOString()}, true)
+        returning
+          id::text,
+          creator_id,
+          name,
+          join_code,
+          starting_balance::float8 as starting_balance,
+          start_date::text,
+          end_date::text,
+          is_active,
+          created_at::text
+      `) as Room[]
+      room = rooms[0] ?? null
+      break
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        continue
+      }
+
+      throw error
+    }
+  }
 
   if (!room) {
     return { ok: false, error: "Unable to create room" }
@@ -77,7 +118,13 @@ export const createRoom = async (
   redirect(`/room/${room.id}`)
 }
 
-export const joinRoom = async (roomId: string): Promise<ActionResult<{ roomId: string }>> => {
+export const joinRoom = async (joinCode: string): Promise<ActionResult<JoinRoomData>> => {
+  const parsedJoinCode = joinCodeSchema.safeParse(joinCode)
+
+  if (!parsedJoinCode.success) {
+    return { ok: false, error: parsedJoinCode.error.issues[0]?.message ?? "Invalid room code" }
+  }
+
   const user = await requireCurrentUser()
 
   if (!user) {
@@ -88,7 +135,7 @@ export const joinRoom = async (roomId: string): Promise<ActionResult<{ roomId: s
   const rooms = (await sql`
     select id::text, starting_balance::float8 as starting_balance, is_active
     from rooms
-    where id = ${roomId}
+    where join_code = ${parsedJoinCode.data}
     limit 1
   `) as Pick<Room, "id" | "starting_balance" | "is_active">[]
   const room = rooms[0]
@@ -108,20 +155,20 @@ export const joinRoom = async (roomId: string): Promise<ActionResult<{ roomId: s
   `
 
   revalidatePath(`/room/${room.id}`)
+  revalidatePath("/dashboard")
   return { ok: true, data: { roomId: room.id } }
 }
 
-export const joinRoomAction = async (formData: FormData): Promise<void> => {
-  const roomId = String(formData.get("roomId") ?? "")
-  const parsedRoomId = z.string().uuid().safeParse(roomId)
+export const joinRoomAction = async (
+  _previousState: ActionResult<JoinRoomData>,
+  formData: FormData,
+): Promise<ActionResult<JoinRoomData>> => {
+  const joinCode = String(formData.get("joinCode") ?? "")
+  const result = await joinRoom(joinCode)
 
-  if (!parsedRoomId.success) {
-    redirect("/dashboard")
-  }
-
-  const result = await joinRoom(parsedRoomId.data)
   if (result.ok) {
     redirect(`/room/${result.data.roomId}`)
   }
-  redirect(`/join/${parsedRoomId.data}?error=${encodeURIComponent(result.error)}`)
+
+  return result
 }

@@ -7,6 +7,7 @@ export type UserProfile = {
   id: string
   email: string
   username: string
+  image_url: string | null
   created_at: string
 }
 
@@ -14,6 +15,7 @@ export type Room = {
   id: string
   creator_id: string
   name: string
+  join_code: string
   starting_balance: number
   start_date: string
   end_date: string
@@ -88,7 +90,7 @@ export type Trade = {
 }
 
 export type ParticipantWithUser = RoomParticipant & {
-  users: Pick<UserProfile, "id" | "username"> | null
+  users: Pick<UserProfile, "id" | "username" | "image_url"> | null
 }
 
 export type ActionResult<T = undefined> =

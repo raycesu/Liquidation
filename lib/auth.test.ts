@@ -31,6 +31,7 @@ describe("requireCurrentUser", () => {
         id: "user_123456",
         email: "demo@example.com",
         username: "existing-name",
+        image_url: "https://img.clerk.com/demo",
         created_at: new Date().toISOString(),
       },
     ])
@@ -42,6 +43,7 @@ describe("requireCurrentUser", () => {
     const fullQuery = Array.isArray(sqlCall?.raw) ? sqlCall.raw.join(" ") : ""
 
     expect(fullQuery).toContain("set email = excluded.email")
+    expect(fullQuery).toContain("image_url = excluded.image_url")
     expect(fullQuery).not.toContain("set username = excluded.username")
   })
 })

@@ -10,7 +10,7 @@ The home route shows a marketing landing page for signed-out users and redirects
 
 - **Dashboard** — See every room you participate in, available margin, and total equity per competition.
 - **Rooms** — Create competitions with name, schedule, starting balance, and active state; open the lobby for participants and leaderboard.
-- **Join flow** — `/join/[room_id]` for accepting an invite-style link after sign-in.
+- **Join flow** — Enter a six-character room code from the dashboard; lobby participants can share the displayed code.
 - **Leaderboard** — Rankings by equity and performance within a room.
 
 ### Trading terminal
@@ -95,7 +95,7 @@ npm run test:watch
 1. Create an application in the [Clerk Dashboard](https://dashboard.clerk.com/).
 2. Copy the publishable and secret keys into `.env.local`.
 3. Sign-in and sign-up routes live under `app/sign-in/[[...sign-in]]` and `app/sign-up/[[...sign-up]]`.
-4. Protected routes (`/dashboard`, `/room`, `/join`) use Clerk in **`proxy.ts`** (middleware matcher).
+4. Protected routes (`/dashboard`, `/room`, and legacy `/join`) use Clerk in **`proxy.ts`** (middleware matcher).
 
 ## Database
 
@@ -122,7 +122,7 @@ Commit the updated generated file when you intentionally change the tradable uni
 | `app/dashboard/profile` | Profile analytics, settings, and share card |
 | `app/room/[room_id]` | Lobby, leaderboard |
 | `app/room/[room_id]/trade` | Trading terminal (server-loaded positions, orders, trades) |
-| `app/join/[room_id]` | Join a room |
+| `app/join/[room_id]` | Legacy join route redirect |
 | `app/user-profile/[[...user-profile]]` | Clerk user profile management route |
 | `actions/*` | Server Actions for trading, rooms, profile helpers |
 | `components/trading-terminal.tsx` | Chart, ticker, order entry, positions panel |

@@ -31,6 +31,7 @@ export default async function RoomPage({ params }: RoomPageProps) {
       id::text,
       creator_id,
       name,
+      join_code,
       starting_balance::float8 as starting_balance,
       start_date::text,
       end_date::text,
@@ -62,7 +63,7 @@ export default async function RoomPage({ params }: RoomPageProps) {
   const participant = participantRows[0]
 
   if (!participant) {
-    redirect(`/join/${room.id}`)
+    redirect("/dashboard")
   }
 
   const participants = (await sql`
@@ -75,15 +76,14 @@ export default async function RoomPage({ params }: RoomPageProps) {
       rp.created_at::text,
       json_build_object(
         'id', u.id,
-        'username', u.username
+        'username', u.username,
+        'image_url', u.image_url
       ) as users
     from room_participants rp
     join users u on u.id = rp.user_id
     where rp.room_id = ${room.id}
     order by rp.total_equity desc
   `) as ParticipantWithUser[]
-
-  const joinPath = `/join/${room.id}`
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
@@ -97,8 +97,10 @@ export default async function RoomPage({ params }: RoomPageProps) {
               </Badge>
             </div>
             <p className="mt-2 text-text-secondary">
-              Starting balance {formatUsd(room.starting_balance)}. Share this path:{" "}
-              <code className="rounded bg-surface-elevated px-2 py-1 text-accent-neon">{joinPath}</code>
+              Starting balance {formatUsd(room.starting_balance)}. Share this room code:{" "}
+              <code className="rounded bg-surface-elevated px-2 py-1 font-mono tracking-[0.2em] text-accent-neon">
+                {room.join_code}
+              </code>
             </p>
           </div>
           <div className="flex gap-3">

@@ -181,6 +181,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
         'id', r.id::text,
         'creator_id', r.creator_id,
         'name', r.name,
+        'join_code', r.join_code,
         'starting_balance', r.starting_balance::float8,
         'start_date', r.start_date::text,
         'end_date', r.end_date::text,
