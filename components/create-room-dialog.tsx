@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import type { ActionResult } from "@/lib/types"
 
 const initialState: ActionResult<{ roomId: string }> = {
@@ -31,11 +32,11 @@ export const CreateRoomDialog = () => {
       <DialogTrigger asChild>
         <Button>Create room</Button>
       </DialogTrigger>
-      <DialogContent className="border-border bg-surface text-text-primary">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-surface text-text-primary">
         <DialogHeader>
           <DialogTitle>Create competition room</DialogTitle>
           <DialogDescription className="text-text-secondary">
-            Set up virtual capital and an end date for the paper-trading competition.
+            Set up the competition details, trading window, and optional room context.
           </DialogDescription>
         </DialogHeader>
 
@@ -65,8 +66,23 @@ export const CreateRoomDialog = () => {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="startDate">Start date</Label>
+            <Input id="startDate" name="startDate" type="datetime-local" required />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="endDate">End date</Label>
             <Input id="endDate" name="endDate" type="datetime-local" required />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              name="description"
+              placeholder="Optional. Describe the competition in 25 words or fewer."
+              className="min-h-24 resize-none"
+            />
           </div>
 
           <Button className="w-full" type="submit" disabled={isPending}>

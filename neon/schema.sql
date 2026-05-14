@@ -12,6 +12,7 @@ create table if not exists public.rooms (
   id uuid primary key default gen_random_uuid(),
   creator_id text not null references public.users(id) on delete cascade,
   name text not null,
+  description text,
   join_code text not null check (join_code ~ '^[A-Z0-9]{6}$'),
   starting_balance numeric not null default 10000 check (starting_balance > 0),
   start_date timestamptz not null default now(),

@@ -15,6 +15,7 @@ export type Room = {
   id: string
   creator_id: string
   name: string
+  description: string | null
   join_code: string
   starting_balance: number
   start_date: string

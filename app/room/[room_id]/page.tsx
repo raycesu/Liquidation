@@ -1,12 +1,15 @@
+import Image from "next/image"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { Leaderboard } from "@/components/leaderboard"
+import type { ReactNode } from "react"
+import { ArrowUpRight, BarChart3, CalendarDays, DoorOpen, Trophy, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { requireCurrentUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
-import { formatUsd } from "@/lib/format"
+import { formatWholeUsd } from "@/lib/format"
 import type { ParticipantWithUser, Room, RoomParticipant } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -16,6 +19,113 @@ type RoomPageProps = {
     room_id: string
   }>
 }
+
+type RoomStatus = "upcoming" | "active" | "ended"
+
+type RoomDetail = {
+  label: string
+  value: ReactNode
+}
+
+const getInitials = (username: string) =>
+  username
+    .split(/[\s-_]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "TR"
+
+const formatCompetitionDateTime = (iso: string) => {
+  const date = new Date(iso)
+
+  if (Number.isNaN(date.getTime())) {
+    return iso
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(date)
+}
+
+const formatCompetitionDateParts = (iso: string) => {
+  const date = new Date(iso)
+
+  if (Number.isNaN(date.getTime())) {
+    return {
+      date: iso,
+      time: "",
+    }
+  }
+
+  return {
+    date: new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(date),
+    time: new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(date),
+  }
+}
+
+const getRoomStatus = (room: Room): RoomStatus => {
+  const now = new Date()
+  const startDate = new Date(room.start_date)
+  const endDate = new Date(room.end_date)
+
+  if (!room.is_active || now > endDate) {
+    return "ended"
+  }
+
+  if (now < startDate) {
+    return "upcoming"
+  }
+
+  return "active"
+}
+
+const getStatusLabel = (status: RoomStatus) => {
+  if (status === "upcoming") {
+    return "Upcoming"
+  }
+
+  if (status === "active") {
+    return "Active"
+  }
+
+  return "Ended"
+}
+
+const getStatusClassName = (status: RoomStatus) => {
+  if (status === "active") {
+    return "border-profit/30 bg-profit/10 text-profit hover:bg-profit/10"
+  }
+
+  if (status === "upcoming") {
+    return "border-accent-neon/35 bg-accent-neon/10 text-accent-neon hover:bg-accent-neon/10"
+  }
+
+  return "border-loss/30 bg-loss/10 text-loss hover:bg-loss/10"
+}
+
+const DetailCard = ({ label, value }: RoomDetail) => (
+  <Card className="border-border/60 bg-surface/70 shadow-xl shadow-accent-blue/5 backdrop-blur-xl">
+    <CardContent className="space-y-4 p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary">{label}</p>
+      <div className="break-words font-heading text-2xl font-semibold tracking-[-0.03em] text-text-primary tabular-nums">
+        {value}
+      </div>
+    </CardContent>
+  </Card>
+)
 
 export default async function RoomPage({ params }: RoomPageProps) {
   const { room_id: roomId } = await params
@@ -31,6 +141,7 @@ export default async function RoomPage({ params }: RoomPageProps) {
       id::text,
       creator_id,
       name,
+      description,
       join_code,
       starting_balance::float8 as starting_balance,
       start_date::text,
@@ -82,68 +193,185 @@ export default async function RoomPage({ params }: RoomPageProps) {
     from room_participants rp
     join users u on u.id = rp.user_id
     where rp.room_id = ${room.id}
-    order by rp.total_equity desc
+    order by rp.created_at asc
   `) as ParticipantWithUser[]
 
-  return (
-    <main className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-4xl font-semibold text-text-primary">{room.name}</h1>
-              <Badge className="bg-accent-blue/15 text-accent-neon hover:bg-accent-blue/15">
-                {room.is_active ? "Active" : "Ended"}
-              </Badge>
-            </div>
-            <p className="mt-2 text-text-secondary">
-              Starting balance {formatUsd(room.starting_balance)}. Share this room code:{" "}
-              <code className="rounded bg-surface-elevated px-2 py-1 font-mono tracking-[0.2em] text-accent-neon">
-                {room.join_code}
-              </code>
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button asChild variant="outline">
-              <Link href="/dashboard">Dashboard</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={`/room/${room.id}/leaderboard`}>Leaderboard</Link>
-            </Button>
-            <Button asChild>
-              <Link href={`/room/${room.id}/trade`}>Enter terminal</Link>
-            </Button>
-          </div>
-        </div>
+  const status = getRoomStatus(room)
+  const roomDescription = room.description?.trim()
+  const startDate = formatCompetitionDateParts(room.start_date)
+  const endDate = formatCompetitionDateParts(room.end_date)
+  const details: RoomDetail[] = [
+    {
+      label: "Starting balance",
+      value: formatWholeUsd(room.starting_balance),
+    },
+    {
+      label: "Room code",
+      value: room.join_code,
+    },
+    {
+      label: "Start date",
+      value: (
+        <span className="flex flex-col gap-1">
+          <span>{startDate.date}</span>
+          <span className="text-base font-medium tracking-normal text-text-secondary">{startDate.time}</span>
+        </span>
+      ),
+    },
+    {
+      label: "End date",
+      value: (
+        <span className="flex flex-col gap-1">
+          <span>{endDate.date}</span>
+          <span className="text-base font-medium tracking-normal text-text-secondary">{endDate.time}</span>
+        </span>
+      ),
+    },
+  ]
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <Card className="border-border bg-surface">
-            <CardHeader>
-              <CardTitle className="text-sm text-text-secondary">Your live equity</CardTitle>
-            </CardHeader>
-            <CardContent className="font-mono text-3xl text-text-primary">
-              {formatUsd(participant.available_margin)}
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-surface">
-            <CardHeader>
-              <CardTitle className="text-sm text-text-secondary">Available margin</CardTitle>
-            </CardHeader>
-            <CardContent className="font-mono text-3xl text-text-primary">
-              {formatUsd(participant.available_margin)}
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-surface">
-            <CardHeader>
-              <CardTitle className="text-sm text-text-secondary">Participants</CardTitle>
-            </CardHeader>
-            <CardContent className="font-mono text-3xl text-text-primary">
-              {participants.length}
-            </CardContent>
-          </Card>
+  return (
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 py-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(23,201,255,0.18),transparent_34%),radial-gradient(circle_at_86%_10%,rgba(10,140,255,0.14),transparent_30%),linear-gradient(180deg,rgba(3,9,20,0),rgba(3,9,20,0.92))]" />
+      <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-8">
+        <header className="overflow-hidden rounded-3xl border border-border/60 bg-surface/65 shadow-2xl shadow-accent-blue/10 backdrop-blur-xl">
+          <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge variant="outline" className={getStatusClassName(status)}>
+                  {getStatusLabel(status)}
+                </Badge>
+                <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/35 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-text-secondary">
+                  <Trophy className="size-3.5 text-accent-neon" aria-hidden />
+                  Trading Competition
+                </span>
+              </div>
+
+              <div className="max-w-3xl space-y-4">
+                <h1 className="font-heading text-4xl font-semibold tracking-[-0.045em] text-white drop-shadow-[0_18px_40px_rgba(10,140,255,0.22)] sm:text-5xl lg:text-6xl">
+                  {room.name}
+                </h1>
+                {roomDescription ? (
+                  <p className="max-w-2xl text-base leading-7 text-text-secondary sm:text-lg">{roomDescription}</p>
+                ) : null}
+              </div>
+            </div>
+
+            <nav className="flex flex-col gap-3 sm:flex-row lg:justify-end" aria-label="Room navigation">
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="h-11 rounded-full border-border/70 bg-background/35 px-5 text-text-primary shadow-lg shadow-accent-blue/5 backdrop-blur transition-colors hover:border-accent-neon/45 hover:bg-surface-elevated hover:text-white dark:bg-background/35 dark:hover:bg-surface-elevated"
+              >
+                <Link href="/dashboard">
+                  <BarChart3 className="size-4" aria-hidden />
+                  Dashboard
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="h-11 rounded-full border-border/70 bg-background/35 px-5 text-text-primary shadow-lg shadow-accent-blue/5 backdrop-blur transition-colors hover:border-accent-neon/45 hover:bg-surface-elevated hover:text-white dark:bg-background/35 dark:hover:bg-surface-elevated"
+              >
+                <Link href={`/room/${room.id}/leaderboard`}>
+                  <Trophy className="size-4" aria-hidden />
+                  Leaderboard
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                className="h-11 rounded-full bg-gradient-to-r from-accent-blue to-accent-neon px-5 font-semibold text-background shadow-lg shadow-accent-blue/25 transition-transform hover:translate-y-[-1px] hover:shadow-accent-blue/35"
+              >
+                <Link href={`/room/${room.id}/trade`}>
+                  <DoorOpen className="size-4" aria-hidden />
+                  Trading Terminal
+                  <ArrowUpRight className="size-4" aria-hidden />
+                </Link>
+              </Button>
+            </nav>
+          </div>
+        </header>
+
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Competition details">
+          {details.map((detail) => (
+            <DetailCard key={detail.label} {...detail} />
+          ))}
         </section>
 
-        <Leaderboard participants={participants} />
+        <Card className="overflow-hidden border-border/60 bg-surface/70 shadow-2xl shadow-accent-blue/5 backdrop-blur-xl">
+          <CardHeader className="gap-3 border-b border-border/40 px-5 py-5 sm:flex sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="font-heading text-2xl font-semibold tracking-[-0.03em] text-text-primary">
+              Participants
+            </CardTitle>
+            <Badge
+              variant="outline"
+              className="h-8 w-fit gap-2 rounded-full border-accent-neon/35 bg-accent-neon/10 px-3 text-sm font-semibold text-accent-neon"
+            >
+              <Users className="size-3.5" aria-hidden />
+              {participants.length.toLocaleString("en-US")} total
+            </Badge>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table className="min-w-[640px] text-sm [&_td]:px-5 [&_td]:py-4">
+              <TableHeader className="bg-background/30 [&_tr]:border-border/40 [&_th]:h-12 [&_th]:px-5 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.18em] [&_th]:text-text-secondary">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Trader Name</TableHead>
+                  <TableHead className="text-right">Joined</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {participants.length > 0 ? (
+                  participants.map((roomParticipant) => {
+                    const username = roomParticipant.users?.username ?? "Anonymous"
+                    const avatarUrl = roomParticipant.users?.image_url
+
+                    return (
+                      <TableRow key={roomParticipant.id} className="border-border/35 hover:bg-surface-elevated/35">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-accent-neon/20 bg-gradient-to-br from-accent-blue/40 via-surface-elevated to-accent-neon/20 ring-1 ring-white/5">
+                              {avatarUrl ? (
+                                <Image
+                                  src={avatarUrl}
+                                  alt={`${username} avatar`}
+                                  fill
+                                  className="object-cover"
+                                  sizes="44px"
+                                  unoptimized
+                                />
+                              ) : (
+                                <span className="flex size-full items-center justify-center text-xs font-semibold text-text-primary">
+                                  {getInitials(username)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-text-primary">{username}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right text-text-secondary tabular-nums">
+                          <span className="inline-flex items-center justify-end gap-2">
+                            <CalendarDays className="size-3.5 text-accent-neon/80" aria-hidden />
+                            {formatCompetitionDateTime(roomParticipant.created_at)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                ) : (
+                  <TableRow className="border-border/35 hover:bg-transparent">
+                    <TableCell colSpan={2} className="h-32 text-center text-text-secondary">
+                      No traders have joined this room yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </main>
   )

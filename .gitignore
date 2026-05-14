@@ -4,6 +4,9 @@ node_modules
 out
 coverage
 
+# Local Playwright CLI logs and snapshots
+.playwright-cli/
+
 # Secret env files — never commit. Use .env.example for placeholders only
 .env
 .env.local

@@ -5,6 +5,12 @@ export const formatUsd = (value: number) =>
     maximumFractionDigits: 2,
   }).format(value)
 
+export const formatWholeUsd = (value: number) =>
+  `${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(value)} USD`
+
 export const formatNumber = (value: number, maximumFractionDigits = 2) =>
   new Intl.NumberFormat("en-US", {
     maximumFractionDigits,

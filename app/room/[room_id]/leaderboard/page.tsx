@@ -252,13 +252,14 @@ export default async function LeaderboardPage({ params, searchParams }: Leaderbo
 
         <Card className="overflow-hidden border-border/60 bg-surface/70 shadow-2xl shadow-accent-blue/5 backdrop-blur-xl">
           <CardContent className="p-0">
-            <Table className="min-w-[760px] text-sm [&_td]:px-5 [&_td]:py-4">
+            <Table className="min-w-[880px] text-sm [&_td]:px-5 [&_td]:py-4">
               <TableHeader className="bg-background/30 [&_tr]:border-border/40 [&_th]:h-12 [&_th]:px-5 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.18em] [&_th]:text-text-secondary">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-20 text-center">Rank</TableHead>
                   <TableHead>Trader Name</TableHead>
                   <TableHead className="text-left">PnL</TableHead>
                   <TableHead className="text-center">Win Rate</TableHead>
+                  <TableHead className="text-center">Number of Trades</TableHead>
                   <TableHead className="text-right">Available Margin</TableHead>
                 </TableRow>
               </TableHeader>
@@ -301,6 +302,9 @@ export default async function LeaderboardPage({ params, searchParams }: Leaderbo
                         <TableCell className="text-center tabular-nums text-accent-neon">
                           {participant.winRate == null ? "--" : formatPercent(participant.winRate)}
                         </TableCell>
+                        <TableCell className="text-center tabular-nums text-text-primary">
+                          {participant.closedTrades}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums text-text-primary">
                           {formatUsd(participant.available_margin)}
                         </TableCell>
@@ -309,7 +313,7 @@ export default async function LeaderboardPage({ params, searchParams }: Leaderbo
                   })
                 ) : (
                   <TableRow className="border-border/35 hover:bg-transparent">
-                    <TableCell colSpan={5} className="h-32 text-center text-text-secondary">
+                    <TableCell colSpan={6} className="h-32 text-center text-text-secondary">
                       No traders in this room yet
                     </TableCell>
                   </TableRow>

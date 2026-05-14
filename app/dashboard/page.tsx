@@ -37,6 +37,7 @@ export default async function DashboardPage() {
         'id', r.id::text,
         'creator_id', r.creator_id,
         'name', r.name,
+        'description', r.description,
         'join_code', r.join_code,
         'starting_balance', r.starting_balance::float8,
         'start_date', r.start_date::text,

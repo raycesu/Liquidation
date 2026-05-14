@@ -7,10 +7,28 @@ import { requireCurrentUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import type { ActionResult, Room } from "@/lib/types"
 
+const MAX_ROOM_DESCRIPTION_WORDS = 25
+
+const normalizeRoomDescription = (description: string) => description.trim().replace(/\s+/g, " ")
+
+const getDescriptionWordCount = (description: string) => description.split(/\s+/).filter(Boolean).length
+
 const createRoomSchema = z.object({
   name: z.string().min(3, "Room name must be at least 3 characters").max(80),
   startingBalance: z.coerce.number().positive("Starting balance must be positive").default(10000),
+  startDate: z.string().min(1, "Choose a start date"),
   endDate: z.string().min(1, "Choose an end date"),
+  description: z
+    .string()
+    .transform((value) => {
+      const description = normalizeRoomDescription(value)
+
+      return description.length > 0 ? description : null
+    })
+    .refine(
+      (description) => !description || getDescriptionWordCount(description) <= MAX_ROOM_DESCRIPTION_WORDS,
+      `Description must be ${MAX_ROOM_DESCRIPTION_WORDS} words or fewer`,
+    ),
 })
 
 const joinCodeSchema = z
@@ -50,16 +68,27 @@ export const createRoom = async (
   const parsed = createRoomSchema.safeParse({
     name: formData.get("name"),
     startingBalance: formData.get("startingBalance"),
-    endDate: formData.get("endDate"),
+    startDate: String(formData.get("startDate") ?? ""),
+    endDate: String(formData.get("endDate") ?? ""),
+    description: String(formData.get("description") ?? ""),
   })
 
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid room details" }
   }
 
+  const startDate = new Date(parsed.data.startDate)
   const endDate = new Date(parsed.data.endDate)
 
-  if (Number.isNaN(endDate.getTime()) || endDate <= new Date()) {
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return { ok: false, error: "Choose valid competition dates" }
+  }
+
+  if (endDate <= startDate) {
+    return { ok: false, error: "End date must be after the start date" }
+  }
+
+  if (endDate <= new Date()) {
     return { ok: false, error: "End date must be in the future" }
   }
 
@@ -76,12 +105,22 @@ export const createRoom = async (
     try {
       const joinCode = generateJoinCode()
       const rooms = (await sql`
-        insert into rooms (creator_id, name, join_code, starting_balance, start_date, end_date, is_active)
-        values (${user.id}, ${parsed.data.name}, ${joinCode}, ${parsed.data.startingBalance}, now(), ${endDate.toISOString()}, true)
+        insert into rooms (creator_id, name, description, join_code, starting_balance, start_date, end_date, is_active)
+        values (
+          ${user.id},
+          ${parsed.data.name},
+          ${parsed.data.description},
+          ${joinCode},
+          ${parsed.data.startingBalance},
+          ${startDate.toISOString()},
+          ${endDate.toISOString()},
+          true
+        )
         returning
           id::text,
           creator_id,
           name,
+          description,
           join_code,
           starting_balance::float8 as starting_balance,
           start_date::text,
