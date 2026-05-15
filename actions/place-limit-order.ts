@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
+import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
 import { getMaxLeverage, isSupportedSymbol } from "@/lib/markets"
 import { getSql } from "@/lib/db"
 import { calculateRequiredMargin } from "@/lib/perpetuals"
@@ -55,6 +56,18 @@ export const placeLimitOrder = async (
 
   if (!user) {
     return { ok: false, error: "You must be signed in to trade" }
+  }
+
+  const membership = await loadRoomForParticipant(parsed.data.roomId, user.id)
+
+  if (!membership.ok) {
+    return membership
+  }
+
+  const tradingGuard = assertRoomTradingOpen(membership.data.room)
+
+  if (!tradingGuard.ok) {
+    return tradingGuard
   }
 
   const sql = getSql()

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
+import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
 import { getSql } from "@/lib/db"
 import { getTriggerSide } from "@/lib/trading-rules"
 import type { ActionResult, PendingOrder, Position } from "@/lib/types"
@@ -38,6 +39,18 @@ export const setPositionTriggers = async (
 
   if (!user) {
     return { ok: false, error: "You must be signed in to update triggers" }
+  }
+
+  const membership = await loadRoomForParticipant(parsed.data.roomId, user.id)
+
+  if (!membership.ok) {
+    return membership
+  }
+
+  const tradingGuard = assertRoomTradingOpen(membership.data.room)
+
+  if (!tradingGuard.ok) {
+    return tradingGuard
   }
 
   const sql = getSql()

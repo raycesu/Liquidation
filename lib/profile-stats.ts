@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db"
+import { computeParticipantEquity } from "@/lib/participant-equity"
 import { fetchMarketPrices } from "@/lib/pricing"
 import { calculatePnl } from "@/lib/perpetuals"
 import type {
@@ -74,8 +75,7 @@ type LastTradeRow = {
 
 const EPS = 1e-6
 
-export const computeDisplayEquity = (availableMargin: number, unrealizedPnl: number) =>
-  availableMargin + unrealizedPnl
+export { computeDisplayEquity, computeParticipantEquity } from "@/lib/participant-equity"
 
 export const computePnlPercent = (displayEquity: number, startingBalance: number) => {
   if (startingBalance <= 0) {
@@ -124,6 +124,19 @@ const parseCount = (value: string | number) => {
 
 const roomIsOngoing = (room: Room) => room.is_active && new Date(room.end_date) > new Date()
 
+const buildOpenMarginByParticipant = (openRows: OpenPositionRow[]) => {
+  const marginByParticipant = new Map<string, number>()
+
+  openRows.forEach((position) => {
+    marginByParticipant.set(
+      position.participant_id,
+      (marginByParticipant.get(position.participant_id) ?? 0) + position.margin_allocated,
+    )
+  })
+
+  return marginByParticipant
+}
+
 const buildUnrealizedByParticipant = (
   openRows: OpenPositionRow[],
   prices: Partial<Record<SupportedSymbol, number>>,
@@ -152,12 +165,17 @@ const buildUnrealizedByParticipant = (
 const rankParticipantsInRoom = (
   roomId: string,
   participants: PlainParticipantRow[],
+  openMarginByParticipant: Map<string, number>,
   unrealizedByParticipant: Map<string, number>,
 ) => {
   const inRoom = participants.filter((p) => p.room_id === roomId)
   const scored = inRoom.map((p) => ({
     id: p.id,
-    displayEquity: computeDisplayEquity(p.available_margin, unrealizedByParticipant.get(p.id) ?? 0),
+    displayEquity: computeParticipantEquity(
+      p.available_margin,
+      openMarginByParticipant.get(p.id) ?? 0,
+      unrealizedByParticipant.get(p.id) ?? 0,
+    ),
   }))
   scored.sort((a, b) => b.displayEquity - a.displayEquity)
   return scored
@@ -351,6 +369,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     }
   }
 
+  const openMarginByParticipant = buildOpenMarginByParticipant(openPositions)
   const unrealizedByParticipant = buildUnrealizedByParticipant(openPositions, prices)
 
   const openByParticipant = new Map<string, boolean>()
@@ -386,7 +405,12 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
       continue
     }
 
-    const ranked = rankParticipantsInRoom(room.id, allRoomParticipants, unrealizedByParticipant)
+    const ranked = rankParticipantsInRoom(
+      room.id,
+      allRoomParticipants,
+      openMarginByParticipant,
+      unrealizedByParticipant,
+    )
     const rankedDisplay = ranked.map((r) => ({ id: r.id, displayEquity: r.displayEquity }))
     const placementRank = placementRankForParticipant(rankedDisplay, row.id)
     const mine = ranked.find((r) => r.id === row.id)

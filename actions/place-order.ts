@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
+import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
 import { getSql } from "@/lib/db"
 import { getMaxLeverage, isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrice } from "@/lib/pricing"
@@ -66,6 +67,18 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
 
   if (!user) {
     return { ok: false, error: "You must be signed in to trade" }
+  }
+
+  const membership = await loadRoomForParticipant(parsed.data.roomId, user.id)
+
+  if (!membership.ok) {
+    return membership
+  }
+
+  const tradingGuard = assertRoomTradingOpen(membership.data.room)
+
+  if (!tradingGuard.ok) {
+    return tradingGuard
   }
 
   const sql = getSql()

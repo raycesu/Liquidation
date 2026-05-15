@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { runTradingEngineForActiveRooms } from "@/actions/run-trading-engine"
+import { runTradingEngineForActiveRooms } from "@/lib/trading-engine/run-trading-engine"
 import { verifyEngineCronSecret } from "@/lib/engine-auth"
 
 /** Called by an external scheduler (e.g. cron-job.org every 1 min), not Vercel Cron on Hobby. */

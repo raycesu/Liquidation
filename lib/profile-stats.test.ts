@@ -10,9 +10,13 @@ import {
 } from "@/lib/profile-stats"
 
 describe("computeDisplayEquity", () => {
-  it("sums margin and unrealized", () => {
-    expect(computeDisplayEquity(1000, 250)).toBe(1250)
-    expect(computeDisplayEquity(1000, -300)).toBe(700)
+  it("sums free margin, open margin, and unrealized PnL", () => {
+    expect(computeDisplayEquity(1000, 500, 250)).toBe(1750)
+    expect(computeDisplayEquity(1000, 500, -300)).toBe(1200)
+  })
+
+  it("matches economic equity for open positions", () => {
+    expect(computeDisplayEquity(8000, 2000, 450)).toBe(10_450)
   })
 })
 

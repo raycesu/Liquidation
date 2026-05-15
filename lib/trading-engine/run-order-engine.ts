@@ -1,5 +1,3 @@
-"use server"
-
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { isSupportedSymbol } from "@/lib/markets"
@@ -14,22 +12,22 @@ import {
   isTakeProfitTriggered,
 } from "@/lib/trading-rules"
 import type { ActionResult, PendingOrder, Position, PositionSide, SupportedSymbol, Trade } from "@/lib/types"
+import type { RunOrderEngineOptions, RunOrderEngineResult } from "@/lib/trading-engine/types"
 
 type PendingOrderRow = PendingOrder & {
   attached_position: Position | null
 }
 
-export type RunOrderEngineResult = {
-  filledOrderIds: string[]
-  cancelledOrderIds: string[]
-  newPositions: Position[]
-  closedPositionIds: string[]
-  trades: Trade[]
+type LimitFillRow = {
+  order_id: string
+  position: Position
+  trade: Trade | null
 }
 
-type RunOrderEngineOptions = {
-  participantId?: string
-  revalidate?: boolean
+type TriggerFillRow = {
+  order_id: string
+  position_id: string
+  trade: Trade | null
 }
 
 export const runOrderEngineForRoom = async (
@@ -221,19 +219,6 @@ export const runOrderEngineForRoom = async (
         continue
       }
 
-      const claimedOrderRows = (await sql`
-        update orders
-        set status = 'FILLED',
-            filled_at = now()
-        where id = ${order.id}
-          and status = 'PENDING'
-        returning id::text
-      `) as { id: string }[]
-
-      if (!claimedOrderRows[0]) {
-        continue
-      }
-
       const positionSide: PositionSide = order.side
       const fillPrice = getLimitFillPrice(order, livePrice)
       const liquidationPrice = calculateLiquidationPrice({
@@ -241,89 +226,106 @@ export const runOrderEngineForRoom = async (
         leverage: order.leverage,
         side: positionSide,
       })
+      const tradeDirection = positionSide === "LONG" ? "OPEN_LONG" : "OPEN_SHORT"
 
-      const insertedPositions = (await sql`
-        insert into positions (
-          participant_id,
-          symbol,
-          side,
-          leverage,
-          size,
-          margin_allocated,
-          entry_price,
-          liquidation_price,
-          is_open
+      const fillRows = (await sql`
+        with claimed as (
+          update orders
+          set status = 'FILLED',
+              filled_at = now()
+          where id = ${order.id}
+            and status = 'PENDING'
+          returning id::text as order_id, participant_id, symbol, side, leverage, size, margin_reserved
+        ),
+        inserted_position as (
+          insert into positions (
+            participant_id,
+            symbol,
+            side,
+            leverage,
+            size,
+            margin_allocated,
+            entry_price,
+            liquidation_price,
+            is_open
+          )
+          select
+            claimed.participant_id,
+            claimed.symbol,
+            ${positionSide},
+            claimed.leverage,
+            claimed.size,
+            claimed.margin_reserved,
+            ${fillPrice},
+            ${liquidationPrice},
+            true
+          from claimed
+          returning
+            id::text,
+            participant_id::text,
+            symbol,
+            side,
+            leverage,
+            size::float8 as size,
+            margin_allocated::float8 as margin_allocated,
+            entry_price::float8 as entry_price,
+            liquidation_price::float8 as liquidation_price,
+            is_open,
+            created_at::text,
+            closed_at::text
+        ),
+        inserted_trade as (
+          insert into trades (
+            participant_id,
+            position_id,
+            symbol,
+            direction,
+            price,
+            size,
+            trade_value,
+            realized_pnl
+          )
+          select
+            inserted_position.participant_id,
+            inserted_position.id,
+            inserted_position.symbol,
+            ${tradeDirection},
+            ${fillPrice},
+            inserted_position.size,
+            inserted_position.size,
+            null
+          from inserted_position
+          returning
+            id::text,
+            participant_id::text,
+            position_id::text,
+            symbol,
+            direction,
+            price::float8 as price,
+            size::float8 as size,
+            trade_value::float8 as trade_value,
+            realized_pnl::float8 as realized_pnl,
+            created_at::text
         )
-        values (
-          ${order.participant_id},
-          ${order.symbol},
-          ${positionSide},
-          ${order.leverage},
-          ${order.size},
-          ${order.margin_reserved},
-          ${fillPrice},
-          ${liquidationPrice},
-          true
-        )
-        returning
-          id::text,
-          participant_id::text,
-          symbol,
-          side,
-          leverage,
-          size::float8 as size,
-          margin_allocated::float8 as margin_allocated,
-          entry_price::float8 as entry_price,
-          liquidation_price::float8 as liquidation_price,
-          is_open,
-          created_at::text,
-          closed_at::text
-      `) as Position[]
-      const newPosition = insertedPositions[0]
+        select
+          claimed.order_id,
+          row_to_json(inserted_position)::jsonb as position,
+          row_to_json(inserted_trade)::jsonb as trade
+        from claimed
+        join inserted_position on true
+        left join inserted_trade on true
+      `) as { order_id: string; position: Position; trade: Trade | null }[]
 
-      if (!newPosition) {
+      const fillRow = fillRows[0] as LimitFillRow | undefined
+
+      if (!fillRow?.position) {
         continue
       }
 
-      newPositions.push(newPosition)
+      newPositions.push(fillRow.position)
 
-      const tradeDirection = positionSide === "LONG" ? "OPEN_LONG" : "OPEN_SHORT"
-      const tradeRows = (await sql`
-        insert into trades (
-          participant_id,
-          position_id,
-          symbol,
-          direction,
-          price,
-          size,
-          trade_value,
-          realized_pnl
-        )
-        values (
-          ${order.participant_id},
-          ${newPosition.id},
-          ${order.symbol},
-          ${tradeDirection},
-          ${fillPrice},
-          ${order.size},
-          ${order.size},
-          null
-        )
-        returning
-          id::text,
-          participant_id::text,
-          position_id::text,
-          symbol,
-          direction,
-          price::float8 as price,
-          size::float8 as size,
-          trade_value::float8 as trade_value,
-          realized_pnl::float8 as realized_pnl,
-          created_at::text
-      `) as Trade[]
-
-      if (tradeRows[0]) {
-        trades.push(tradeRows[0])
+      if (fillRow.trade) {
+        trades.push(fillRow.trade)
       }
 
       filledOrderIds.push(order.id)
@@ -373,88 +375,96 @@ export const runOrderEngineForRoom = async (
     })
     const realizedPnl = floorRealizedPnl(rawPnl, attachedPosition.margin_allocated)
     const nextAvailableMargin = Math.max(0, availableMargin + attachedPosition.margin_allocated + realizedPnl)
+    const tradeDirection = attachedPosition.side === "LONG" ? "CLOSE_LONG" : "CLOSE_SHORT"
 
-    const closedRows = (await sql`
-      update positions
-      set is_open = false,
-          closed_at = now()
-      where id = ${attachedPosition.id}
-        and is_open = true
-      returning id::text
-    `) as { id: string }[]
+    const triggerRows = (await sql`
+      with claimed_order as (
+        update orders
+        set status = 'FILLED',
+            filled_at = now()
+        where id = ${order.id}
+          and status = 'PENDING'
+        returning id::text as order_id
+      ),
+      closed_position as (
+        update positions
+        set is_open = false,
+            closed_at = now()
+        where id = ${attachedPosition.id}
+          and is_open = true
+          and exists (select 1 from claimed_order)
+        returning id::text as position_id
+      ),
+      updated_margin as (
+        update room_participants
+        set available_margin = ${nextAvailableMargin},
+            total_equity = ${nextAvailableMargin}
+        where id = ${order.participant_id}
+          and exists (select 1 from closed_position)
+        returning id::text
+      ),
+      cancelled_siblings as (
+        update orders
+        set status = 'CANCELLED',
+            cancelled_at = now()
+        where position_id = ${attachedPosition.id}
+          and status = 'PENDING'
+          and id <> ${order.id}
+          and exists (select 1 from closed_position)
+        returning id::text
+      ),
+      inserted_trade as (
+        insert into trades (
+          participant_id,
+          position_id,
+          symbol,
+          direction,
+          price,
+          size,
+          trade_value,
+          realized_pnl
+        )
+        select
+          ${order.participant_id},
+          ${attachedPosition.id},
+          ${order.symbol},
+          ${tradeDirection},
+          ${positionPrice},
+          ${attachedPosition.size},
+          ${attachedPosition.size},
+          ${realizedPnl}
+        where exists (select 1 from closed_position)
+        returning
+          id::text,
+          participant_id::text,
+          position_id::text,
+          symbol,
+          direction,
+          price::float8 as price,
+          size::float8 as size,
+          trade_value::float8 as trade_value,
+          realized_pnl::float8 as realized_pnl,
+          created_at::text
+      )
+      select
+        claimed_order.order_id,
+        closed_position.position_id,
+        row_to_json(inserted_trade)::jsonb as trade
+      from claimed_order
+      join closed_position on true
+      left join inserted_trade on true
+    `) as { order_id: string; position_id: string; trade: Trade | null }[]
 
-    if (!closedRows[0]) {
+    const triggerRow = triggerRows[0] as TriggerFillRow | undefined
+
+    if (!triggerRow?.position_id) {
       continue
     }
-
-    await sql`
-      update room_participants
-      set available_margin = ${nextAvailableMargin},
-          total_equity = ${nextAvailableMargin}
-      where id = ${order.participant_id}
-    `
 
     participantMargins.set(order.participant_id, nextAvailableMargin)
 
-    await sql`
-      update orders
-      set status = 'CANCELLED',
-          cancelled_at = now()
-      where position_id = ${attachedPosition.id}
-        and status = 'PENDING'
-        and id <> ${order.id}
-    `
-
-    const claimedTriggerRows = (await sql`
-      update orders
-      set status = 'FILLED',
-          filled_at = now()
-      where id = ${order.id}
-        and status = 'PENDING'
-      returning id::text
-    `) as { id: string }[]
-
-    if (!claimedTriggerRows[0]) {
-      continue
-    }
-
-    const tradeDirection = attachedPosition.side === "LONG" ? "CLOSE_LONG" : "CLOSE_SHORT"
-    const tradeRows = (await sql`
-      insert into trades (
-        participant_id,
-        position_id,
-        symbol,
-        direction,
-        price,
-        size,
-        trade_value,
-        realized_pnl
-      )
-      values (
-        ${order.participant_id},
-        ${attachedPosition.id},
-        ${order.symbol},
-        ${tradeDirection},
-        ${positionPrice},
-        ${attachedPosition.size},
-        ${attachedPosition.size},
-        ${realizedPnl}
-      )
-      returning
-        id::text,
-        participant_id::text,
-        position_id::text,
-        symbol,
-        direction,
-        price::float8 as price,
-        size::float8 as size,
-        trade_value::float8 as trade_value,
-        realized_pnl::float8 as realized_pnl,
-        created_at::text
-    `) as Trade[]
-
-    if (tradeRows[0]) {
-      trades.push(tradeRows[0])
+    if (triggerRow.trade) {
+      trades.push(triggerRow.trade)
     }
 
     closedPositionIds.push(attachedPosition.id)

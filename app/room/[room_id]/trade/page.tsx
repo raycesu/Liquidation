@@ -2,7 +2,8 @@ import { redirect } from "next/navigation"
 import { TradingTerminal } from "@/components/trading-terminal"
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
-import type { PendingOrder, Position, RoomParticipant, Trade } from "@/lib/types"
+import { getCompetitionPhase } from "@/lib/room-competition-status"
+import type { PendingOrder, Position, Room, RoomParticipant, Trade } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
@@ -21,6 +22,32 @@ export default async function TradePage({ params }: TradePageProps) {
   }
 
   const sql = getSql()
+  const roomRows = (await sql`
+    select
+      id::text,
+      creator_id,
+      name,
+      description,
+      join_code,
+      starting_balance::float8 as starting_balance,
+      start_date::text as start_date,
+      end_date::text as end_date,
+      is_active,
+      created_at::text as created_at
+    from rooms
+    where id = ${roomId}
+    limit 1
+  `) as Room[]
+  const room = roomRows[0]
+
+  if (!room) {
+    redirect("/dashboard")
+  }
+
+  if (getCompetitionPhase(room) !== "ongoing") {
+    redirect(`/room/${roomId}`)
+  }
+
   const participantRows = (await sql`
     select
       id::text,

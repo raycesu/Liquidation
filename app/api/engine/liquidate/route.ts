@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { runTradingEngineForActiveRooms } from "@/actions/run-trading-engine"
+import { runTradingEngineForActiveRooms } from "@/lib/trading-engine/run-trading-engine"
 import { verifyEngineCronSecret } from "@/lib/engine-auth"
 
 const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 })

@@ -45,7 +45,20 @@ describe("joinRoom", () => {
 
     const sqlMock = jest
       .fn()
-      .mockResolvedValueOnce([{ id: "room_1", starting_balance: 10000, is_active: true }])
+      .mockResolvedValueOnce([
+        {
+          id: "room_1",
+          creator_id: "creator_1",
+          name: "Arena",
+          description: null,
+          join_code: "ABC123",
+          starting_balance: 10000,
+          start_date: "2026-01-01T00:00:00.000Z",
+          end_date: "2099-12-31T23:59:59.000Z",
+          is_active: true,
+          created_at: "2026-01-01T00:00:00.000Z",
+        },
+      ])
       .mockResolvedValueOnce([])
     getSqlMock.mockReturnValue(sqlMock as unknown as ReturnType<typeof getSql>)
 

@@ -1,25 +1,9 @@
-"use server"
-
-import { runLiquidationEngineForRoom } from "@/actions/liquidate"
-import { runOrderEngineForRoom } from "@/actions/run-order-engine"
+import { runLiquidationEngineForRoom } from "@/lib/trading-engine/liquidate"
+import { runOrderEngineForRoom } from "@/lib/trading-engine/run-order-engine"
 import { getSql } from "@/lib/db"
+import type { RunTradingEngineSummary, TradingEngineRoomSummary } from "@/lib/trading-engine/types"
 
-export type TradingEngineRoomSummary = {
-  roomId: string
-  filledOrders: number
-  cancelledOrders: number
-  closedPositions: number
-  liquidated: number
-}
-
-export type RunTradingEngineSummary = {
-  processedRooms: number
-  totalFilledOrders: number
-  totalCancelledOrders: number
-  totalClosedPositions: number
-  totalLiquidated: number
-  rooms: TradingEngineRoomSummary[]
-}
+export type { RunTradingEngineSummary, TradingEngineRoomSummary } from "@/lib/trading-engine/types"
 
 export const runTradingEngineForActiveRooms = async (): Promise<RunTradingEngineSummary> => {
   const sql = getSql()

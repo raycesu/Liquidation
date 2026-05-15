@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
+import { assertRoomJoinable } from "@/lib/competition-guards"
 import { getSql } from "@/lib/db"
 import type { ActionResult, Room } from "@/lib/types"
 
@@ -172,19 +173,31 @@ export const joinRoom = async (joinCode: string): Promise<ActionResult<JoinRoomD
 
   const sql = getSql()
   const rooms = (await sql`
-    select id::text, starting_balance::float8 as starting_balance, is_active
+    select
+      id::text,
+      creator_id,
+      name,
+      description,
+      join_code,
+      starting_balance::float8 as starting_balance,
+      start_date::text as start_date,
+      end_date::text as end_date,
+      is_active,
+      created_at::text as created_at
     from rooms
     where join_code = ${parsedJoinCode.data}
     limit 1
-  `) as Pick<Room, "id" | "starting_balance" | "is_active">[]
+  `) as Room[]
   const room = rooms[0]
 
   if (!room) {
     return { ok: false, error: "Room not found" }
   }
 
-  if (!room.is_active) {
-    return { ok: false, error: "This room is no longer active" }
+  const joinableGuard = assertRoomJoinable(room)
+
+  if (!joinableGuard.ok) {
+    return joinableGuard
   }
 
   await sql`
