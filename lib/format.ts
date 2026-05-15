@@ -44,6 +44,20 @@ export const formatCompactUsd = (value: number) => {
   return formatUsd(value)
 }
 
+export const formatProfileDate = (iso: string) => {
+  const date = new Date(iso)
+
+  if (Number.isNaN(date.getTime())) {
+    return iso
+  }
+
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+}
+
 export const formatDateTime = (iso: string) => {
   const date = new Date(iso)
 

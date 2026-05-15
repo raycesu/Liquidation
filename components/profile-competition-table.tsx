@@ -108,7 +108,16 @@ export const ProfileCompetitionTable = ({ rows }: ProfileCompetitionTableProps) 
   }
 
   if (rows.length === 0) {
-    return null
+    return (
+      <Card className="border-border bg-surface">
+        <CardHeader>
+          <CardTitle className="text-text-primary">Competition history</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-text-secondary">No competitions yet. Join a room from the dashboard to get started.</p>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (

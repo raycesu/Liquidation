@@ -10,6 +10,7 @@ import type {
   ProfileSpotlightTrade,
   ProfileSummaryStats,
   ProfileTradingStyle,
+  ProfileWipeoutEvent,
   Room,
   SupportedSymbol,
 } from "@/lib/types"
@@ -64,6 +65,11 @@ type ClosedTradeRoeRow = {
   entry_price: number
   close_price: number
   room_name: string
+}
+
+type LastTradeRow = {
+  participant_id: string
+  last_trade_at: string | null
 }
 
 const EPS = 1e-6
@@ -203,6 +209,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
         allTimeAvgPnlPercent: null,
         bestTradeRoePercent: null,
         timesLiquidated: 0,
+        wipeouts: [],
       },
       tradingStyle: {
         longCount: 0,
@@ -216,7 +223,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     }
   }
 
-  const [allRoomParticipants, openPositions, entryRows, stylePositions, symbolRows, roeRows] =
+  const [allRoomParticipants, openPositions, entryRows, stylePositions, symbolRows, roeRows, lastTradeRows] =
     (await Promise.all([
       sql`
         select
@@ -313,6 +320,15 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
           and t.realized_pnl is not null
           and p.margin_allocated > 0
       `,
+      sql`
+        select
+          rp.id::text as participant_id,
+          max(t.created_at)::text as last_trade_at
+        from room_participants rp
+        left join trades t on t.participant_id = rp.id
+        where rp.user_id = ${userId}
+        group by rp.id
+      `,
     ])) as unknown as [
       PlainParticipantRow[],
       OpenPositionRow[],
@@ -320,6 +336,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
       PositionStyleRow[],
       SymbolCountRow[],
       ClosedTradeRoeRow[],
+      LastTradeRow[],
     ]
 
   const symbols = Array.from(new Set(openPositions.map((p) => p.symbol))) as SupportedSymbol[]
@@ -336,9 +353,16 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     entryByParticipant.set(row.participant_id, parseCount(row.entry_count))
   })
 
+  const lastTradeByParticipant = new Map<string, string>()
+  lastTradeRows.forEach((row) => {
+    if (row.last_trade_at) {
+      lastTradeByParticipant.set(row.participant_id, row.last_trade_at)
+    }
+  })
+
   const competitionRows: ProfileCompetitionRow[] = []
   const pnlPercents: number[] = []
-  let timesLiquidated = 0
+  const wipeouts: ProfileWipeoutEvent[] = []
 
   for (const row of myRows) {
     const room = row.rooms
@@ -358,7 +382,11 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     const hasOpen = openByParticipant.has(row.id)
 
     if (isAccountBusted(displayEquity, hasOpen)) {
-      timesLiquidated += 1
+      wipeouts.push({
+        roomId: room.id,
+        roomName: room.name,
+        wipedAtIso: lastTradeByParticipant.get(row.id) ?? room.end_date,
+      })
     }
 
     competitionRows.push({
@@ -381,11 +409,14 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     }
   })
 
+  wipeouts.sort((a, b) => new Date(a.wipedAtIso).getTime() - new Date(b.wipedAtIso).getTime())
+
   const summary: ProfileSummaryStats = {
     competitionsEntered: myRows.length,
     allTimeAvgPnlPercent: meanOrNull(pnlPercents),
     bestTradeRoePercent: maxOrNull(globalRoes),
-    timesLiquidated,
+    timesLiquidated: wipeouts.length,
+    wipeouts,
   }
 
   const tradingStyle = buildTradingStyle(stylePositions, symbolRows)

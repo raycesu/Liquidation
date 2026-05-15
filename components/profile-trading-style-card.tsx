@@ -1,31 +1,40 @@
+import { HoldTimeSpectrum } from "@/components/profile/style-visuals/hold-time-spectrum"
+import { LeverageSpectrum } from "@/components/profile/style-visuals/leverage-spectrum"
+import { LongShortBiasTank } from "@/components/profile/style-visuals/long-short-bias-tank"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatNumber } from "@/lib/format"
+import { formatHoldMs } from "@/lib/profile-style-visuals"
+import { cn } from "@/lib/utils"
 import type { ProfileTradingStyle } from "@/lib/types"
 
 type ProfileTradingStyleCardProps = {
   style: ProfileTradingStyle
+  embedded?: boolean
 }
 
-const formatHoldMs = (ms: number | null) => {
-  if (ms == null || !Number.isFinite(ms) || ms <= 0) {
-    return "—"
-  }
+const styleCardClassName = cn(
+  "relative overflow-hidden rounded-2xl border border-white/10",
+  "bg-[#050a14] bg-[radial-gradient(ellipse_70%_55%_at_0%_0%,rgb(17_201_255/0.16),transparent_50%),radial-gradient(ellipse_50%_45%_at_100%_100%,rgb(10_140_255/0.1),transparent_55%)]",
+  "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-sm",
+)
 
-  const hours = ms / 3_600_000
-
-  if (hours < 1) {
-    return `${Math.round(ms / 60_000)} min`
-  }
-
-  if (hours < 48) {
-    return `${hours.toFixed(1)} h`
-  }
-
-  return `${(hours / 24).toFixed(1)} d`
-}
-
-export const ProfileTradingStyleCard = ({ style }: ProfileTradingStyleCardProps) => {
+export const ProfileTradingStyleCard = ({ style, embedded = false }: ProfileTradingStyleCardProps) => {
   const shortBias = 100 - style.longBiasPercent
+
+  if (embedded) {
+    return (
+      <div className={styleCardClassName}>
+        <div className="relative p-5 sm:p-6">
+          <h2 className="text-lg font-semibold text-text-primary">Style</h2>
+          <div className="mt-6 space-y-6">
+            <LongShortBiasTank longBiasPercent={style.longBiasPercent} />
+            <LeverageSpectrum averageLeverage={style.averageLeverage} />
+            <HoldTimeSpectrum averageHoldMs={style.averageHoldMs} />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <Card className="border-border bg-surface">

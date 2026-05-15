@@ -116,11 +116,18 @@ export type ProfileCompetitionRow = {
   displayEquity: number
 }
 
+export type ProfileWipeoutEvent = {
+  roomId: string
+  roomName: string
+  wipedAtIso: string
+}
+
 export type ProfileSummaryStats = {
   competitionsEntered: number
   allTimeAvgPnlPercent: number | null
   bestTradeRoePercent: number | null
   timesLiquidated: number
+  wipeouts: ProfileWipeoutEvent[]
 }
 
 export type ProfileTradingStyle = {
