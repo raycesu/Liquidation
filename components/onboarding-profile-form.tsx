@@ -65,7 +65,7 @@ export const OnboardingProfileForm = ({ avatarUrl, suggestedUsername }: Onboardi
             Add a profile photo for competition leaderboards, or skip and add one later.
           </p>
           <Button variant="outline" asChild>
-            <Link href="/user-profile?redirect_url=/onboarding">Change photo</Link>
+            <Link href="/user-profile/photo?redirect_url=/onboarding">Change photo</Link>
           </Button>
         </div>
       </div>

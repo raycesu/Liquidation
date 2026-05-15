@@ -62,7 +62,7 @@ export const ProfileSettingsForm = ({ username }: ProfileSettingsFormProps) => {
           Profile photos appear on competition leaderboards. Manage your photo in account settings.
         </p>
         <Button className="mt-3" variant="outline" asChild>
-          <Link href="/user-profile?redirect_url=/dashboard/profile">Change profile photo</Link>
+          <Link href="/user-profile/photo?redirect_url=/dashboard/profile">Change profile photo</Link>
         </Button>
       </div>
     </div>
