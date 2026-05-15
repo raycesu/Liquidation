@@ -1,0 +1,26 @@
+# Optional backup scheduler (every 5 minutes). Primary setup: cron-job.org (see README).
+# Required GitHub repo secrets: APP_URL, ENGINE_CRON_SECRET
+
+name: Trading engine
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST /api/engine/run
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          ENGINE_CRON_SECRET: ${{ secrets.ENGINE_CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$ENGINE_CRON_SECRET" ]; then
+            echo "Skipping: set APP_URL and ENGINE_CRON_SECRET in repository secrets."
+            exit 0
+          fi
+          curl -fsS -X POST "${APP_URL%/}/api/engine/run" \
+            -H "Authorization: Bearer ${ENGINE_CRON_SECRET}" \
+            -H "Content-Type: application/json"

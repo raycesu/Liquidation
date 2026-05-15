@@ -4,7 +4,7 @@ import { verifyEngineCronSecret } from "@/lib/engine-auth"
 
 const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-/** @deprecated Prefer POST /api/engine/run — kept for existing cron URLs */
+/** @deprecated Prefer POST /api/engine/run — kept for older scheduler URLs */
 export const POST = async (request: Request) => {
   if (!verifyEngineCronSecret(request)) {
     return unauthorized()

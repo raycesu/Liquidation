@@ -42,7 +42,7 @@ Signed-out visitors see a **marketing landing page** at `/`. Signed-in users wit
 - **Server Actions** for trading, rooms, profile onboarding, and order/liquidation engine helpers.
 - **Zod** validation, **Jest** + Testing Library for unit and component tests.
 - **TypeScript** throughout.
-- **Trading engine cron API** — `POST /api/engine/run` (secured with `ENGINE_CRON_SECRET`) fills limits/TP/SL and liquidates underwater positions across all active rooms. Vercel Cron is configured in `vercel.json` (every minute). The terminal also polls every 3s while open for low-latency fills.
+- **Trading engine API** — `POST /api/engine/run` (secured with `ENGINE_CRON_SECRET`) fills limits/TP/SL and liquidates underwater positions across all active rooms. Use an external scheduler ([cron-job.org](https://cron-job.org), recommended) because Vercel Hobby cron is once per day. The terminal also polls every 3s while open for low-latency fills.
 
 ## Stack
 
@@ -81,9 +81,58 @@ Required variables (see `.env.example` for the canonical list):
 - `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/dashboard`
 - `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/onboarding`
 
-Optional:
+Optional (required for production order fills when users are offline):
 
-- `ENGINE_CRON_SECRET` — Bearer token for `POST /api/engine/run` (set the same value in your cron job’s `Authorization: Bearer …` header)
+- `ENGINE_CRON_SECRET` — Bearer token for `POST /api/engine/run` (same value in your external cron provider)
+
+## Background trading engine (cron)
+
+Vercel **Hobby** cron only runs **once per day**, which is too slow for limits, TP/SL, and liquidation. The app uses an **external HTTP scheduler** instead.
+
+| Layer | When it runs | Purpose |
+|-------|----------------|---------|
+| **Terminal polling** | Every 3s while `/trade` is open | Fast fills for active traders |
+| **External cron** | Every 1 min (recommended) | Fills and liquidation when nobody is online |
+
+### Recommended: [cron-job.org](https://cron-job.org) (free)
+
+- Free tier: multiple jobs, **as often as every 1 minute**
+- Supports `POST` and custom `Authorization` headers
+- No code in this repo beyond `POST /api/engine/run`
+
+**Setup**
+
+1. Generate a secret: `openssl rand -hex 32`
+2. Add `ENGINE_CRON_SECRET` to Vercel (Production) and redeploy.
+3. Create a free account at [cron-job.org](https://console.cron-job.org/).
+4. **Cronjobs** → **Create cronjob**:
+   - **Title:** Liquidation trading engine
+   - **URL:** `https://YOUR-PRODUCTION-DOMAIN.vercel.app/api/engine/run`
+   - **Schedule:** Every 1 minute (`*/1 * * * *` or the UI equivalent)
+   - **Request method:** `POST`
+   - **Headers:** `Authorization` = `Bearer YOUR_ENGINE_CRON_SECRET`
+   - Enable the job and save.
+5. Open the job’s **History** after a minute and confirm **200** responses.
+
+**Test manually**
+
+```bash
+curl -X POST "https://YOUR-PRODUCTION-DOMAIN.vercel.app/api/engine/run" \
+  -H "Authorization: Bearer YOUR_ENGINE_CRON_SECRET"
+```
+
+### Optional backup: GitHub Actions
+
+If the repo is on GitHub, `.github/workflows/trading-engine-cron.yml` can call the same endpoint **every 5 minutes** (GitHub’s minimum for scheduled workflows).
+
+Repository **Settings** → **Secrets and variables** → **Actions**:
+
+| Secret | Example |
+|--------|---------|
+| `APP_URL` | `https://your-app.vercel.app` |
+| `ENGINE_CRON_SECRET` | same as Vercel |
+
+You can use cron-job.org alone, GitHub Actions alone, or both (cron-job.org is better for 1-minute cadence).
 
 ## Install and run
 
@@ -152,7 +201,8 @@ Commit the updated generated file when you intentionally change the tradable uni
 | `app/room/[room_id]/trade` | Trading terminal |
 | `app/join/[room_id]` | Legacy redirect to dashboard |
 | `app/user-profile/[[...user-profile]]` | Account settings and `/photo` route |
-| `app/api/engine/run` | Cron: order fills + liquidation for all active rooms |
+| `app/api/engine/run` | External cron target: order fills + liquidation |
+| `.github/workflows/trading-engine-cron.yml` | Optional GitHub Actions scheduler (every 5 min) |
 | `actions/run-order-engine.ts` | Room-wide limit / TP / SL processing |
 | `actions/run-trading-engine.ts` | Orchestrates engine pass for active rooms |
 | `hooks/useTradingEngineSync.ts` | Terminal polling (3s) while trade UI is open |
