@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
-import { getSql } from "@/lib/db"
+import { getSql, withUserContext } from "@/lib/db"
 import { getMaxLeverage, isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrice } from "@/lib/pricing"
 import { calculateLiquidationPrice, calculateRequiredMargin } from "@/lib/perpetuals"
@@ -81,24 +81,9 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
     return tradingGuard
   }
 
-  const sql = getSql()
-  const participants = (await sql`
-    select
-      id::text,
-      room_id::text,
-      user_id,
-      available_margin::float8 as available_margin,
-      total_equity::float8 as total_equity,
-      created_at::text
-    from room_participants
-    where id = ${parsed.data.participantId}
-      and room_id = ${parsed.data.roomId}
-      and user_id = ${user.id}
-    limit 1
-  `) as RoomParticipant[]
-  const participant = participants[0]
+  const participant = membership.data.participant
 
-  if (!participant) {
+  if (participant.id !== parsed.data.participantId) {
     return { ok: false, error: "Participant not found" }
   }
 
@@ -144,6 +129,8 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
     }
   }
 
+  return withUserContext(user.id, async () => {
+  const sql = getSql()
   const marginRows = (await sql`
     update room_participants
     set available_margin = available_margin - ${requiredMargin}
@@ -353,4 +340,5 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
       availableMargin: nextAvailableMargin,
     },
   }
+  })
 }

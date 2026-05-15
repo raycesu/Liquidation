@@ -3,7 +3,7 @@
 import { z } from "zod"
 import { runOrderEngineForRoom } from "@/lib/trading-engine/run-order-engine"
 import { requireOnboardedUser } from "@/lib/auth"
-import { getSql } from "@/lib/db"
+import { getSql, withUserContext } from "@/lib/db"
 import { releaseEnginePoll, tryAcquireEnginePoll } from "@/lib/engine-poll-throttle"
 import type { ActionResult, Position, Trade } from "@/lib/types"
 
@@ -35,69 +35,71 @@ export const checkPendingOrders = async ({
     return { ok: false, error: "You must be signed in" }
   }
 
-  const sql = getSql()
-  const participants = (await sql`
-    select id::text
-    from room_participants
-    where room_id = ${roomId}
-      and user_id = ${user.id}
-    limit 1
-  `) as { id: string }[]
-  const participant = participants[0]
-
-  if (!participant) {
-    return { ok: false, error: "Participant not found" }
-  }
-
-  const pollKey = `${user.id}:${roomId}`
-
-  if (!tryAcquireEnginePoll(pollKey)) {
-    return {
-      ok: true,
-      data: {
-        filledOrderIds: [],
-        cancelledOrderIds: [],
-        newPositions: [],
-        closedPositionIds: [],
-        trades: [],
-        availableMargin: null,
-        skippedSymbols: [],
-        skippedOrderIds: [],
-      },
-    }
-  }
-
-  try {
-    const engineResult = await runOrderEngineForRoom(roomId, {
-      participantId: participant.id,
-      revalidate: false,
-    })
-
-    if (!engineResult.ok) {
-      return engineResult
-    }
-
-    const marginRows = (await sql`
-      select available_margin::float8 as available_margin
+  return withUserContext(user.id, async () => {
+    const sql = getSql()
+    const participants = (await sql`
+      select id::text
       from room_participants
-      where id = ${participant.id}
+      where room_id = ${roomId}
+        and user_id = ${user.id}
       limit 1
-    `) as { available_margin: number }[]
+    `) as { id: string }[]
+    const participant = participants[0]
 
-    return {
-      ok: true,
-      data: {
-        filledOrderIds: engineResult.data.filledOrderIds,
-        cancelledOrderIds: engineResult.data.cancelledOrderIds,
-        newPositions: engineResult.data.newPositions,
-        closedPositionIds: engineResult.data.closedPositionIds,
-        trades: engineResult.data.trades,
-        availableMargin: marginRows[0]?.available_margin ?? null,
-        skippedSymbols: engineResult.data.skippedSymbols,
-        skippedOrderIds: engineResult.data.skippedOrderIds,
-      },
+    if (!participant) {
+      return { ok: false, error: "Participant not found" }
     }
-  } finally {
-    releaseEnginePoll(pollKey)
-  }
+
+    const pollKey = `${user.id}:${roomId}`
+
+    if (!tryAcquireEnginePoll(pollKey)) {
+      return {
+        ok: true,
+        data: {
+          filledOrderIds: [],
+          cancelledOrderIds: [],
+          newPositions: [],
+          closedPositionIds: [],
+          trades: [],
+          availableMargin: null,
+          skippedSymbols: [],
+          skippedOrderIds: [],
+        },
+      }
+    }
+
+    try {
+      const engineResult = await runOrderEngineForRoom(roomId, {
+        participantId: participant.id,
+        revalidate: false,
+      })
+
+      if (!engineResult.ok) {
+        return engineResult
+      }
+
+      const marginRows = (await sql`
+        select available_margin::float8 as available_margin
+        from room_participants
+        where id = ${participant.id}
+        limit 1
+      `) as { available_margin: number }[]
+
+      return {
+        ok: true,
+        data: {
+          filledOrderIds: engineResult.data.filledOrderIds,
+          cancelledOrderIds: engineResult.data.cancelledOrderIds,
+          newPositions: engineResult.data.newPositions,
+          closedPositionIds: engineResult.data.closedPositionIds,
+          trades: engineResult.data.trades,
+          availableMargin: marginRows[0]?.available_margin ?? null,
+          skippedSymbols: engineResult.data.skippedSymbols,
+          skippedOrderIds: engineResult.data.skippedOrderIds,
+        },
+      }
+    } finally {
+      releaseEnginePoll(pollKey)
+    }
+  })
 }

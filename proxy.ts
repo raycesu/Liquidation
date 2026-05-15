@@ -9,6 +9,7 @@ const isProtectedRoute = createRouteMatcher([
   "/room(.*)",
   "/join(.*)",
   "/onboarding",
+  "/user-profile(.*)",
 ])
 
 export default clerkMiddleware(

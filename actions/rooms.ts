@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomJoinable } from "@/lib/competition-guards"
-import { getSql } from "@/lib/db"
+import { getSql, withUserContext } from "@/lib/db"
 import { checkRateLimit } from "@/lib/rate-limit"
 import type { ActionResult, Room } from "@/lib/types"
 
@@ -100,63 +100,71 @@ export const createRoom = async (
     return { ok: false, error: "You must be signed in to create a room" }
   }
 
-  const sql = getSql()
-  let room: Room | null = null
+  const setupResult = await withUserContext(user.id, async (): Promise<ActionResult<CreateRoomData>> => {
+    const sql = getSql()
+    let room: Room | null = null
 
-  for (let attempt = 0; attempt < ROOM_CODE_MAX_ATTEMPTS; attempt += 1) {
-    try {
-      const joinCode = generateJoinCode()
-      const rooms = (await sql`
-        insert into rooms (creator_id, name, description, join_code, starting_balance, start_date, end_date, is_active)
-        values (
-          ${user.id},
-          ${parsed.data.name},
-          ${parsed.data.description},
-          ${joinCode},
-          ${parsed.data.startingBalance},
-          ${startDate.toISOString()},
-          ${endDate.toISOString()},
-          true
-        )
-        returning
-          id::text,
-          creator_id,
-          name,
-          description,
-          join_code,
-          starting_balance::float8 as starting_balance,
-          start_date::text,
-          end_date::text,
-          is_active,
-          created_at::text
-      `) as Room[]
-      room = rooms[0] ?? null
-      break
-    } catch (error) {
-      if (isUniqueViolation(error)) {
-        continue
+    for (let attempt = 0; attempt < ROOM_CODE_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const joinCode = generateJoinCode()
+        const rooms = (await sql`
+          insert into rooms (creator_id, name, description, join_code, starting_balance, start_date, end_date, is_active)
+          values (
+            ${user.id},
+            ${parsed.data.name},
+            ${parsed.data.description},
+            ${joinCode},
+            ${parsed.data.startingBalance},
+            ${startDate.toISOString()},
+            ${endDate.toISOString()},
+            true
+          )
+          returning
+            id::text,
+            creator_id,
+            name,
+            description,
+            join_code,
+            starting_balance::float8 as starting_balance,
+            start_date::text,
+            end_date::text,
+            is_active,
+            created_at::text
+        `) as Room[]
+        room = rooms[0] ?? null
+        break
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          continue
+        }
+
+        throw error
       }
-
-      throw error
     }
-  }
 
-  if (!room) {
-    return { ok: false, error: "Unable to create room" }
-  }
+    if (!room) {
+      return { ok: false, error: "Unable to create room" }
+    }
 
-  const participants = (await sql`
-    insert into room_participants (room_id, user_id, available_margin, total_equity)
-    values (${room.id}, ${user.id}, ${room.starting_balance}, ${room.starting_balance})
-    returning id::text
-  `) as { id: string }[]
+    const participants = (await sql`
+      insert into room_participants (room_id, user_id, available_margin)
+      values (${room.id}, ${user.id}, ${room.starting_balance})
+      returning id::text
+    `) as { id: string }[]
 
-  if (!participants[0]) {
-    return { ok: false, error: "Room created, but participant setup failed" }
+    if (!participants[0]) {
+      return { ok: false, error: "Room created, but participant setup failed" }
+    }
+
+    return { ok: true, data: { roomId: room.id } }
+  })
+
+  if (!setupResult.ok) {
+    return setupResult
   }
 
   revalidatePath("/dashboard")
-  redirect(`/room/${room.id}`)
+  redirect(`/room/${setupResult.data.roomId}`)
 }
 
 export const joinRoom = async (joinCode: string): Promise<ActionResult<JoinRoomData>> => {
@@ -182,44 +190,46 @@ export const joinRoom = async (joinCode: string): Promise<ActionResult<JoinRoomD
     }
   }
 
-  const sql = getSql()
-  const rooms = (await sql`
-    select
-      id::text,
-      creator_id,
-      name,
-      description,
-      join_code,
-      starting_balance::float8 as starting_balance,
-      start_date::text as start_date,
-      end_date::text as end_date,
-      is_active,
-      created_at::text as created_at
-    from rooms
-    where join_code = ${parsedJoinCode.data}
-    limit 1
-  `) as Room[]
-  const room = rooms[0]
+  return withUserContext(user.id, async () => {
+    const sql = getSql()
+    const rooms = (await sql`
+      select
+        id::text,
+        creator_id,
+        name,
+        description,
+        join_code,
+        starting_balance::float8 as starting_balance,
+        start_date::text as start_date,
+        end_date::text as end_date,
+        is_active,
+        created_at::text as created_at
+      from rooms
+      where join_code = ${parsedJoinCode.data}
+      limit 1
+    `) as Room[]
+    const room = rooms[0]
 
-  if (!room) {
-    return { ok: false, error: "Room not found" }
-  }
+    if (!room) {
+      return { ok: false, error: "Room not found" }
+    }
 
-  const joinableGuard = assertRoomJoinable(room)
+    const joinableGuard = assertRoomJoinable(room)
 
-  if (!joinableGuard.ok) {
-    return joinableGuard
-  }
+    if (!joinableGuard.ok) {
+      return joinableGuard
+    }
 
-  await sql`
-    insert into room_participants (room_id, user_id, available_margin, total_equity)
-    values (${room.id}, ${user.id}, ${room.starting_balance}, ${room.starting_balance})
-    on conflict (room_id, user_id) do nothing
-  `
+    await sql`
+      insert into room_participants (room_id, user_id, available_margin)
+      values (${room.id}, ${user.id}, ${room.starting_balance})
+      on conflict (room_id, user_id) do nothing
+    `
 
-  revalidatePath(`/room/${room.id}`)
-  revalidatePath("/dashboard")
-  return { ok: true, data: { roomId: room.id } }
+    revalidatePath(`/room/${room.id}`)
+    revalidatePath("/dashboard")
+    return { ok: true, data: { roomId: room.id } }
+  })
 }
 
 export const joinRoomAction = async (

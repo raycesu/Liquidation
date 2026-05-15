@@ -415,8 +415,7 @@ export const runOrderEngineForRoom = async (
       ),
       updated_margin as (
         update room_participants
-        set available_margin = ${nextAvailableMargin},
-            total_equity = ${nextAvailableMargin}
+        set available_margin = ${nextAvailableMargin}
         where id = ${order.participant_id}
           and exists (select 1 from closed_position)
         returning id::text

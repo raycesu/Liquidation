@@ -72,10 +72,17 @@ export const PnlLeaderboardSection = ({
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-20 text-center">Rank</TableHead>
                 <TableHead>Trader Name</TableHead>
-                <TableHead className="text-left">PnL</TableHead>
+                <TableHead
+                  className="text-left"
+                  title="Realized plus unrealized PnL from open positions at current marks"
+                >
+                  PnL
+                </TableHead>
                 <TableHead className="text-center">Win Rate</TableHead>
                 <TableHead className="text-center">Number of Trades</TableHead>
-                <TableHead className="text-right">Available Margin</TableHead>
+                <TableHead className="text-right" title="Cash available to open new positions">
+                  Free margin
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

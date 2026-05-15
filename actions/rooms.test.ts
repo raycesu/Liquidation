@@ -8,6 +8,7 @@ jest.mock("@/lib/auth", () => ({
 
 jest.mock("@/lib/db", () => ({
   getSql: jest.fn(),
+  withUserContext: jest.fn((_userId: string, run: () => Promise<unknown>) => run()),
 }))
 
 jest.mock("next/cache", () => ({

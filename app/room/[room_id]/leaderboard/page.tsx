@@ -47,7 +47,6 @@ export default async function LeaderboardPage({ params, searchParams }: Leaderbo
       rp.room_id::text,
       rp.user_id,
       rp.available_margin::float8 as available_margin,
-      rp.total_equity::float8 as total_equity,
       rp.created_at::text,
       json_build_object(
         'id', u.id,

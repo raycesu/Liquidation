@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
-import { getSql } from "@/lib/db"
+import { getSql, withUserContext } from "@/lib/db"
 import type { ActionResult, PendingOrder, RoomParticipant } from "@/lib/types"
 
 type OrderWithParticipant = PendingOrder & {
@@ -52,6 +52,7 @@ export const cancelOrder = async ({
     return tradingGuard
   }
 
+  return withUserContext(user.id, async () => {
   const sql = getSql()
   const orders = (await sql`
     select
@@ -74,12 +75,12 @@ export const cancelOrder = async ({
         'room_id', rp.room_id::text,
         'user_id', rp.user_id,
         'available_margin', rp.available_margin::float8,
-        'total_equity', rp.total_equity::float8,
         'created_at', rp.created_at::text
       ) as room_participants
     from orders o
     join room_participants rp on rp.id = o.participant_id
     where o.id = ${orderId}
+      and rp.room_id = ${parsed.data.roomId}
       and rp.user_id = ${user.id}
     limit 1
   `) as OrderWithParticipant[]
@@ -126,4 +127,5 @@ export const cancelOrder = async ({
       availableMargin: nextAvailableMargin,
     },
   }
+  })
 }

@@ -5,7 +5,7 @@ import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
 import { fetchMarketPrice } from "@/lib/pricing"
-import { getSql } from "@/lib/db"
+import { getSql, withUserContext } from "@/lib/db"
 import { calculatePnl, floorRealizedPnl } from "@/lib/perpetuals"
 import type { ActionResult, Position, RoomParticipant, Trade } from "@/lib/types"
 
@@ -56,6 +56,7 @@ export const closePosition = async ({
     return tradingGuard
   }
 
+  return withUserContext(user.id, async () => {
   const sql = getSql()
   const positions = (await sql`
     select
@@ -76,12 +77,12 @@ export const closePosition = async ({
         'room_id', rp.room_id::text,
         'user_id', rp.user_id,
         'available_margin', rp.available_margin::float8,
-        'total_equity', rp.total_equity::float8,
         'created_at', rp.created_at::text
       ) as room_participants
     from positions p
     join room_participants rp on rp.id = p.participant_id
     where p.id = ${positionId}
+      and rp.room_id = ${parsed.data.roomId}
       and rp.user_id = ${user.id}
     limit 1
   `) as PositionWithParticipant[]
@@ -113,8 +114,6 @@ export const closePosition = async ({
     0,
     position.room_participants.available_margin + position.margin_allocated + realizedPnl,
   )
-  const nextTotalEquity = Math.max(0, nextAvailableMargin)
-
   const closedRows = (await sql`
     update positions
     set is_open = false,
@@ -130,8 +129,7 @@ export const closePosition = async ({
 
   await sql`
     update room_participants
-    set available_margin = ${nextAvailableMargin},
-        total_equity = ${nextTotalEquity}
+    set available_margin = ${nextAvailableMargin}
     where id = ${position.room_participants.id}
   `
 
@@ -191,4 +189,5 @@ export const closePosition = async ({
       availableMargin: nextAvailableMargin,
     },
   }
+  })
 }

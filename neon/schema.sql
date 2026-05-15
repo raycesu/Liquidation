@@ -27,7 +27,6 @@ create table if not exists public.room_participants (
   room_id uuid not null references public.rooms(id) on delete cascade,
   user_id text not null references public.users(id) on delete cascade,
   available_margin numeric not null check (available_margin >= 0),
-  total_equity numeric not null check (total_equity >= 0),
   created_at timestamptz not null default now(),
   unique (room_id, user_id)
 );
@@ -45,12 +44,6 @@ create table if not exists public.positions (
   is_open boolean not null default true,
   created_at timestamptz not null default now(),
   closed_at timestamptz
-);
-
-create table if not exists public.latest_prices (
-  symbol text primary key check (char_length(symbol) >= 3 and char_length(symbol) <= 64),
-  price numeric not null check (price > 0),
-  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.orders (
@@ -115,7 +108,6 @@ alter table public.users enable row level security;
 alter table public.rooms enable row level security;
 alter table public.room_participants enable row level security;
 alter table public.positions enable row level security;
-alter table public.latest_prices enable row level security;
 alter table public.orders enable row level security;
 alter table public.trades enable row level security;
 
@@ -253,12 +245,6 @@ with check (
       and rp.user_id = public.current_app_user_id()
   )
 );
-
-drop policy if exists latest_prices_select_authenticated on public.latest_prices;
-create policy latest_prices_select_authenticated
-on public.latest_prices
-for select
-using (public.current_app_user_id() is not null);
 
 drop policy if exists orders_select_room_members on public.orders;
 create policy orders_select_room_members

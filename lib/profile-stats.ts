@@ -21,7 +21,6 @@ type ParticipantRow = {
   room_id: string
   user_id: string
   available_margin: number
-  total_equity: number
   rooms: Room | null
 }
 
@@ -30,7 +29,6 @@ type PlainParticipantRow = {
   room_id: string
   user_id: string
   available_margin: number
-  total_equity: number
 }
 
 type OpenPositionRow = Position & {
@@ -200,7 +198,6 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
       rp.room_id::text,
       rp.user_id,
       rp.available_margin::float8 as available_margin,
-      rp.total_equity::float8 as total_equity,
       json_build_object(
         'id', r.id::text,
         'creator_id', r.creator_id,
@@ -248,8 +245,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
           rp.id::text,
           rp.room_id::text,
           rp.user_id,
-          rp.available_margin::float8 as available_margin,
-          rp.total_equity::float8 as total_equity
+          rp.available_margin::float8 as available_margin
         from room_participants rp
         where exists (
           select 1

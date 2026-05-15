@@ -13,6 +13,7 @@ jest.mock("@/lib/competition-guards", () => ({
 
 jest.mock("@/lib/db", () => ({
   getSql: jest.fn(),
+  withUserContext: jest.fn((_userId: string, run: () => Promise<unknown>) => run()),
 }))
 
 jest.mock("next/cache", () => ({
@@ -45,22 +46,16 @@ describe("placeOrder", () => {
           is_active: true,
         },
         participant: {
-          id: "participant-1",
+          id: "00000000-0000-4000-8000-000000000001",
+          room_id: "00000000-0000-4000-8000-000000000002",
+          user_id: "user-1",
           available_margin: 10_000,
+          created_at: "2026-01-01T00:00:00.000Z",
         },
       },
     } as never)
     assertRoomTradingOpenMock.mockReturnValue({ ok: true, data: undefined })
-    getSqlMock.mockReturnValue((async () => [
-      {
-        id: "00000000-0000-4000-8000-000000000001",
-        room_id: "00000000-0000-4000-8000-000000000002",
-        user_id: "user-1",
-        available_margin: 10_000,
-        total_equity: 10_000,
-        created_at: "2026-01-01T00:00:00.000Z",
-      },
-    ]) as never)
+    getSqlMock.mockReturnValue((async () => []) as never)
   })
 
   it("returns a friendly error when market price fetch fails", async () => {

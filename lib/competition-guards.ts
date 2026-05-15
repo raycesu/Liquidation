@@ -1,5 +1,5 @@
 import { getCompetitionPhase } from "@/lib/room-competition-status"
-import { getSql } from "@/lib/db"
+import { getSql, withUserContext } from "@/lib/db"
 import type { ActionResult, Room, RoomParticipant } from "@/lib/types"
 
 export const TRADING_CLOSED_MESSAGE = "Trading is only available while the competition is ongoing"
@@ -30,14 +30,14 @@ export const loadRoomForParticipant = async (
   roomId: string,
   userId: string,
 ): Promise<ActionResult<RoomForParticipant>> => {
-  const sql = getSql()
-  const rows = (await sql`
+  const rows = await withUserContext(userId, async () => {
+    const sql = getSql()
+    return (await sql`
     select
       rp.id::text,
       rp.room_id::text,
       rp.user_id,
       rp.available_margin::float8 as available_margin,
-      rp.total_equity::float8 as total_equity,
       rp.created_at::text,
       json_build_object(
         'id', r.id::text,
@@ -57,6 +57,7 @@ export const loadRoomForParticipant = async (
       and rp.user_id = ${userId}
     limit 1
   `) as (RoomParticipant & { room: Room | null })[]
+  })
 
   const row = rows[0]
 
@@ -73,7 +74,6 @@ export const loadRoomForParticipant = async (
         room_id: row.room_id,
         user_id: row.user_id,
         available_margin: row.available_margin,
-        total_equity: row.total_equity,
         created_at: row.created_at,
       },
     },

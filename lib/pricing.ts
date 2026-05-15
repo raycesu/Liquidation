@@ -1,6 +1,16 @@
 import { fetchHlAllMids } from "@/lib/hyperliquid"
 import { getMarket, isSupportedSymbol } from "@/lib/markets"
 
+const PRICE_CACHE_TTL_MS = 1500
+
+type PriceCacheEntry = {
+  prices: Record<string, number>
+  expiresAt: number
+}
+
+const batchPriceCache = new Map<string, PriceCacheEntry>()
+const singlePriceCache = new Map<string, { price: number; expiresAt: number }>()
+
 const parsePositive = (raw: string | undefined): number | null => {
   if (raw == null) {
     return null
@@ -11,6 +21,8 @@ const parsePositive = (raw: string | undefined): number | null => {
   }
   return n
 }
+
+const cacheKeyForSymbols = (symbols: string[]) => [...symbols].sort().join(",")
 
 export const fetchFuturesPrice = async (binanceSymbol: string): Promise<number> => {
   const response = await fetch(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${binanceSymbol}`, {
@@ -38,18 +50,30 @@ export const fetchMarketPrice = async (canonicalSymbol: string): Promise<number>
     throw new Error(`Unsupported market: ${canonicalSymbol}`)
   }
 
+  const cached = singlePriceCache.get(canonicalSymbol)
+  const now = Date.now()
+
+  if (cached && cached.expiresAt > now) {
+    return cached.price
+  }
+
+  let price: number
+
   if (market.priceSource === "binance-futures" && market.binanceSymbol) {
-    return fetchFuturesPrice(market.binanceSymbol)
+    price = await fetchFuturesPrice(market.binanceSymbol)
+  } else {
+    const mids = await fetchHlAllMids("xyz")
+    const key = market.hlPriceKey ?? market.symbol
+    const mid = parsePositive(mids[key])
+
+    if (mid == null) {
+      throw new Error(`Unable to fetch Hyperliquid mid for ${key}`)
+    }
+
+    price = mid
   }
 
-  const mids = await fetchHlAllMids("xyz")
-  const key = market.hlPriceKey ?? market.symbol
-  const price = parsePositive(mids[key])
-
-  if (price == null) {
-    throw new Error(`Unable to fetch Hyperliquid mid for ${key}`)
-  }
-
+  singlePriceCache.set(canonicalSymbol, { price, expiresAt: now + PRICE_CACHE_TTL_MS })
   return price
 }
 
@@ -62,6 +86,14 @@ export const fetchMarketPrices = async (canonicalSymbols: string[]): Promise<Rec
 
   if (uniq.length === 0) {
     return out
+  }
+
+  const cacheKey = cacheKeyForSymbols(uniq)
+  const now = Date.now()
+  const cached = batchPriceCache.get(cacheKey)
+
+  if (cached && cached.expiresAt > now) {
+    return { ...cached.prices }
   }
 
   const binanceCanon = uniq.filter((s) => getMarket(s)?.priceSource === "binance-futures")
@@ -102,6 +134,12 @@ export const fetchMarketPrices = async (canonicalSymbols: string[]): Promise<Rec
         out[canon] = px
       }
     }
+  }
+
+  batchPriceCache.set(cacheKey, { prices: out, expiresAt: now + PRICE_CACHE_TTL_MS })
+
+  for (const [symbol, price] of Object.entries(out)) {
+    singlePriceCache.set(symbol, { price, expiresAt: now + PRICE_CACHE_TTL_MS })
   }
 
   return out

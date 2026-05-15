@@ -45,8 +45,6 @@ const liquidatePositionBatch = async (
     }
 
     const tradeDirection = position.side === "LONG" ? "CLOSE_LONG" : "CLOSE_SHORT"
-    const participantId = position.room_participants.id
-    const availableMargin = position.room_participants.available_margin
 
     const closedRows = (await sql`
       with closed_position as (
@@ -63,13 +61,6 @@ const liquidatePositionBatch = async (
             cancelled_at = now()
         where position_id = ${position.id}
           and status = 'PENDING'
-          and exists (select 1 from closed_position)
-        returning id::text
-      ),
-      updated_participant as (
-        update room_participants
-        set total_equity = ${availableMargin}
-        where id = ${participantId}
           and exists (select 1 from closed_position)
         returning id::text
       ),
@@ -108,27 +99,6 @@ const liquidatePositionBatch = async (
   }
 
   return { liquidated, liquidatedPositionIds }
-}
-
-const cacheLatestPrices = async (symbols: SupportedSymbol[], prices: Record<string, number>) => {
-  const sql = getSql()
-  const updatedAt = new Date().toISOString()
-
-  for (const symbol of symbols) {
-    const price = prices[symbol]
-
-    if (price == null || !Number.isFinite(price) || price <= 0) {
-      continue
-    }
-
-    await sql`
-      insert into latest_prices (symbol, price, updated_at)
-      values (${symbol}, ${price}, ${updatedAt})
-      on conflict (symbol) do update
-      set price = excluded.price,
-          updated_at = excluded.updated_at
-    `
-  }
 }
 
 const fetchOpenPositionsForRoom = async (roomId: string) => {
@@ -204,8 +174,6 @@ export const liquidateParticipantPositions = async (
 
   const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol))) as SupportedSymbol[]
   const prices = await fetchMarketPrices(symbols)
-  await cacheLatestPrices(symbols, prices)
-
   const result = await liquidatePositionBatch(roomPositions, prices)
 
   if (revalidate && result.liquidated > 0) {
@@ -230,8 +198,6 @@ export const runLiquidationEngineForRoom = async (
 
   const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol))) as SupportedSymbol[]
   const prices = await fetchMarketPrices(symbols)
-  await cacheLatestPrices(symbols, prices)
-
   const result = await liquidatePositionBatch(roomPositions, prices)
 
   if (revalidate && result.liquidated > 0) {

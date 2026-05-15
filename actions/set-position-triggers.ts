@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
-import { getSql } from "@/lib/db"
+import { getSql, withUserContext } from "@/lib/db"
 import { getTriggerSide } from "@/lib/trading-rules"
 import type { ActionResult, PendingOrder, Position } from "@/lib/types"
 
@@ -53,6 +53,7 @@ export const setPositionTriggers = async (
     return tradingGuard
   }
 
+  return withUserContext(user.id, async () => {
   const sql = getSql()
   const positions = (await sql`
     select
@@ -72,6 +73,7 @@ export const setPositionTriggers = async (
     from positions p
     join room_participants rp on rp.id = p.participant_id
     where p.id = ${parsed.data.positionId}
+      and rp.room_id = ${parsed.data.roomId}
       and rp.user_id = ${user.id}
     limit 1
   `) as PositionWithUser[]
@@ -221,4 +223,5 @@ export const setPositionTriggers = async (
       triggers,
     },
   }
+  })
 }

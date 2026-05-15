@@ -30,7 +30,6 @@ export type RoomParticipant = {
   room_id: string
   user_id: string
   available_margin: number
-  total_equity: number
   created_at: string
 }
 
@@ -47,12 +46,6 @@ export type Position = {
   is_open: boolean
   created_at: string
   closed_at: string | null
-}
-
-export type LatestPrice = {
-  symbol: SupportedSymbol
-  price: number
-  updated_at: string
 }
 
 export type OrderType = "LIMIT" | "TAKE_PROFIT" | "STOP_LOSS"

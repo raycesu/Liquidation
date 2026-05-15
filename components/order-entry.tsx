@@ -1,7 +1,7 @@
 "use client"
 
 import { ChevronDown } from "lucide-react"
-import { useMemo, useState, useTransition } from "react"
+import { useMemo, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { placeLimitOrder } from "@/actions/place-limit-order"
 import { placeOrder } from "@/actions/place-order"
@@ -82,7 +82,9 @@ export const OrderEntry = ({
   const [slLossPercent, setSlLossPercent] = useState("")
   const [limitPrice, setLimitPrice] = useState("")
   const [inlineError, setInlineError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const submitInFlightRef = useRef(false)
 
   const baseSymbol = getMarket(symbol)?.base ?? symbol
   const numericSize = Number(sizeUsd)
@@ -226,9 +228,17 @@ export const OrderEntry = ({
   }
 
   const handleSubmit = () => {
+    if (submitInFlightRef.current || isSubmitting || isPending) {
+      return
+    }
+
+    submitInFlightRef.current = true
+    setIsSubmitting(true)
     setInlineError(null)
 
     if (!previewEntryPrice || previewEntryPrice <= 0) {
+      submitInFlightRef.current = false
+      setIsSubmitting(false)
       setInlineError(
         orderType === "LIMIT" ? "Enter a valid limit price." : "Waiting for live market price.",
       )
@@ -237,11 +247,15 @@ export const OrderEntry = ({
 
     if (!Number.isFinite(numericSize) || numericSize <= 0) {
       setInlineError("Enter a positive position size.")
+      submitInFlightRef.current = false
+      setIsSubmitting(false)
       return
     }
 
     if (availableMargin < requiredMargin) {
       setInlineError("Insufficient margin.")
+      submitInFlightRef.current = false
+      setIsSubmitting(false)
       return
     }
 
@@ -250,6 +264,7 @@ export const OrderEntry = ({
 
     if (orderType === "LIMIT") {
       startTransition(async () => {
+        try {
         const result = await placeLimitOrder({
           participantId,
           roomId,
@@ -269,6 +284,10 @@ export const OrderEntry = ({
         onLimitOrderPlaced(result.data.order, result.data.availableMargin)
         toast.success(`Limit ${side === "LONG" ? "buy" : "sell"} ${baseSymbol} placed`)
         setSizePercent(0)
+        } finally {
+          submitInFlightRef.current = false
+          setIsSubmitting(false)
+        }
       })
       return
     }
@@ -296,6 +315,7 @@ export const OrderEntry = ({
     onOptimisticPosition(optimisticPosition)
 
     startTransition(async () => {
+      try {
       const result = await placeOrder({
         participantId,
         roomId,
@@ -322,6 +342,10 @@ export const OrderEntry = ({
       onOrderPlaced(optimisticId, result.data)
       toast.success(`${side} ${baseSymbol} opened`)
       setSizePercent(0)
+      } finally {
+        submitInFlightRef.current = false
+        setIsSubmitting(false)
+      }
     })
   }
 
@@ -604,7 +628,7 @@ export const OrderEntry = ({
 
         <Button
           type="button"
-          disabled={isPending}
+          disabled={isSubmitting || isPending}
           onClick={handleSubmit}
           className={cn(
             "h-11 w-full rounded-lg text-sm font-semibold shadow-lg transition-all",

@@ -5,7 +5,7 @@ import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
 import { getMaxLeverage, isSupportedSymbol } from "@/lib/markets"
-import { getSql } from "@/lib/db"
+import { getSql, withUserContext } from "@/lib/db"
 import { calculateRequiredMargin } from "@/lib/perpetuals"
 import type { ActionResult, PendingOrder, RoomParticipant } from "@/lib/types"
 
@@ -70,24 +70,9 @@ export const placeLimitOrder = async (
     return tradingGuard
   }
 
-  const sql = getSql()
-  const participants = (await sql`
-    select
-      id::text,
-      room_id::text,
-      user_id,
-      available_margin::float8 as available_margin,
-      total_equity::float8 as total_equity,
-      created_at::text
-    from room_participants
-    where id = ${parsed.data.participantId}
-      and room_id = ${parsed.data.roomId}
-      and user_id = ${user.id}
-    limit 1
-  `) as RoomParticipant[]
-  const participant = participants[0]
+  const participant = membership.data.participant
 
-  if (!participant) {
+  if (participant.id !== parsed.data.participantId) {
     return { ok: false, error: "Participant not found" }
   }
 
@@ -97,6 +82,8 @@ export const placeLimitOrder = async (
     return { ok: false, error: "Insufficient margin." }
   }
 
+  return withUserContext(user.id, async () => {
+  const sql = getSql()
   const marginRows = (await sql`
     update room_participants
     set available_margin = available_margin - ${requiredMargin}
@@ -172,4 +159,5 @@ export const placeLimitOrder = async (
       availableMargin: nextAvailableMargin,
     },
   }
+  })
 }

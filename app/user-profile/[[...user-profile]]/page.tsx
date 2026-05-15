@@ -1,13 +1,21 @@
 import type { Metadata } from "next"
+import { redirect } from "next/navigation"
 import { Suspense } from "react"
 import { UserProfileRouting } from "@/components/user-profile/user-profile-routing"
 import { UserProfileShell } from "@/components/user-profile/user-profile-shell"
+import { requireCurrentUser } from "@/lib/auth"
 
 export const metadata: Metadata = {
   title: "Account settings · Liquidation",
 }
 
-export default function UserProfilePage() {
+export default async function UserProfilePage() {
+  const user = await requireCurrentUser()
+
+  if (!user) {
+    redirect("/sign-in")
+  }
+
   return (
     <UserProfileShell>
       <Suspense

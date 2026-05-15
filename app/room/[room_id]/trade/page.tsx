@@ -54,7 +54,6 @@ export default async function TradePage({ params }: TradePageProps) {
       room_id::text,
       user_id,
       available_margin::float8 as available_margin,
-      total_equity::float8 as total_equity,
       created_at::text
     from room_participants
     where room_id = ${roomId}

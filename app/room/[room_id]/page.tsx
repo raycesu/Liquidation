@@ -143,7 +143,6 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
       room_id::text,
       user_id,
       available_margin::float8 as available_margin,
-      total_equity::float8 as total_equity,
       created_at::text
     from room_participants
     where room_id = ${room.id}
@@ -162,7 +161,6 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
       rp.room_id::text,
       rp.user_id,
       rp.available_margin::float8 as available_margin,
-      rp.total_equity::float8 as total_equity,
       rp.created_at::text,
       json_build_object(
         'id', u.id,
@@ -247,6 +245,17 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
                 <Link href="/dashboard">
                   <BarChart3 className="size-4" aria-hidden />
                   Dashboard
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="h-11 rounded-full border-border/70 bg-background/35 px-5 text-text-primary shadow-lg shadow-accent-blue/5 backdrop-blur transition-colors hover:border-accent-neon/45 hover:bg-surface-elevated hover:text-white dark:bg-background/35 dark:hover:bg-surface-elevated"
+              >
+                <Link href={`/room/${room.id}/leaderboard`}>
+                  <Trophy className="size-4" aria-hidden />
+                  Full leaderboard
                 </Link>
               </Button>
               <Button
