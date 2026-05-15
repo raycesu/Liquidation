@@ -1,6 +1,6 @@
 export const BRAND_NAME = "Liquidation"
 
-const BRAND_LOGO_PATH = "/images/liquidation-logo.png"
+export const BRAND_LOGO_PATH = "/images/liquidation-logo.png"
 
 /**
  * Bump when you replace `public/images/liquidation-logo.png` but keep the same filename.

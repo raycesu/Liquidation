@@ -52,7 +52,7 @@ export const ProfilePageTabs = ({
               Competition History
             </TabsTrigger>
             <TabsTrigger value="share" className={tabTriggerClassName}>
-              Share Trades
+              Share Competitions
             </TabsTrigger>
           </TabsList>
         </div>

@@ -33,7 +33,7 @@ Signed-out visitors see a **marketing landing page** at `/`. Signed-in users wit
 
 ### Profile and account
 
-- **`/dashboard/profile`** — Tabbed experience: **Trading Stats** (summary metrics and trading-style visuals), **Competition History**, and **Share Trades** (export-friendly share card via `html-to-image`).
+- **`/dashboard/profile`** — Tabbed experience: **Trading Stats** (summary metrics and trading-style visuals), **Competition History**, and **Share competitions** (export-friendly competition summary card via `html-to-image`).
 - **Profile settings** — Update username with validation and case-insensitive uniqueness checks.
 - **`/user-profile`** — Clerk account and security settings in a custom shell; **`/user-profile/photo`** for profile photo upload and sync to the app database.
 

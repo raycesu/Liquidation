@@ -7,7 +7,7 @@ import type {
   ProfileCompetitionRow,
   ProfileDashboardData,
   ProfileShareRoomOption,
-  ProfileSpotlightTrade,
+  ProfileShareTradeHighlight,
   ProfileSummaryStats,
   ProfileTradingStyle,
   ProfileWipeoutEvent,
@@ -353,6 +353,11 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     entryByParticipant.set(row.participant_id, parseCount(row.entry_count))
   })
 
+  const participantCountByRoom = new Map<string, number>()
+  allRoomParticipants.forEach((p) => {
+    participantCountByRoom.set(p.room_id, (participantCountByRoom.get(p.room_id) ?? 0) + 1)
+  })
+
   const lastTradeByParticipant = new Map<string, string>()
   lastTradeRows.forEach((row) => {
     if (row.last_trade_at) {
@@ -421,7 +426,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
 
   const tradingStyle = buildTradingStyle(stylePositions, symbolRows)
 
-  const shareRoomOptions = buildShareRoomOptions(competitionRows, roeRows)
+  const shareRoomOptions = buildShareRoomOptions(competitionRows, roeRows, participantCountByRoom)
 
   return {
     competitionRows,
@@ -471,10 +476,7 @@ const buildTradingStyle = (positions: PositionStyleRow[], symbolRows: SymbolCoun
   }
 }
 
-const toSpotlight = (
-  row: ClosedTradeRoeRow,
-  placementRank: number,
-): ProfileSpotlightTrade | null => {
+export const toShareTradeHighlight = (row: ClosedTradeRoeRow): ProfileShareTradeHighlight | null => {
   const roe = closedTradeRoePercent(row.realized_pnl, row.margin_allocated)
 
   if (roe == null) {
@@ -482,44 +484,44 @@ const toSpotlight = (
   }
 
   return {
-    roomId: row.room_id,
     tradeId: row.trade_id,
     symbol: row.symbol,
     side: row.side,
     leverage: row.leverage,
     roePercent: roe,
     realizedPnl: row.realized_pnl,
-    entryPrice: row.entry_price,
-    closePrice: row.close_price,
-    roomName: row.room_name,
-    placementRank,
   }
 }
+
+export const pickTopTradesByPnl = (
+  rows: ClosedTradeRoeRow[],
+  limit = 3,
+): ProfileShareTradeHighlight[] =>
+  rows
+    .map((row) => ({ row, highlight: toShareTradeHighlight(row) }))
+    .filter((x): x is { row: ClosedTradeRoeRow; highlight: ProfileShareTradeHighlight } => x.highlight != null)
+    .sort((a, b) => b.row.realized_pnl - a.row.realized_pnl)
+    .slice(0, limit)
+    .map(({ highlight }) => highlight)
 
 const buildShareRoomOptions = (
   competitionRows: ProfileCompetitionRow[],
   roeRows: ClosedTradeRoeRow[],
+  participantCountByRoom: Map<string, number>,
 ): ProfileShareRoomOption[] =>
   competitionRows.map((comp) => {
     const roomTrades = roeRows.filter((r) => r.room_id === comp.room.id)
-    const withRoe = roomTrades
-      .map((row) => ({
-        row,
-        roe: closedTradeRoePercent(row.realized_pnl, row.margin_allocated),
-      }))
-      .filter((x): x is { row: ClosedTradeRoeRow; roe: number } => x.roe != null)
-      .sort((a, b) => b.roe - a.roe)
-
-    const spotlightCandidates = withRoe
-      .map(({ row }) => toSpotlight(row, comp.placementRank))
-      .filter((s): s is ProfileSpotlightTrade => s != null)
 
     return {
       room: comp.room,
       participantId: comp.participantId,
       placementRank: comp.placementRank,
       pnlPercent: comp.pnlPercent,
-      defaultSpotlight: spotlightCandidates[0] ?? null,
-      spotlightCandidates,
+      entryCount: comp.entryCount,
+      participantCount: participantCountByRoom.get(comp.room.id) ?? 0,
+      startDateIso: comp.room.start_date,
+      endDateIso: comp.endDateIso,
+      isOngoing: comp.isOngoing,
+      topTrades: pickTopTradesByPnl(roomTrades),
     }
   })

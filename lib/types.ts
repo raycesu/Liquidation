@@ -139,18 +139,13 @@ export type ProfileTradingStyle = {
   topSymbols: { symbol: SupportedSymbol; count: number }[]
 }
 
-export type ProfileSpotlightTrade = {
-  roomId: string
+export type ProfileShareTradeHighlight = {
   tradeId: string
   symbol: SupportedSymbol
   side: PositionSide
   leverage: number
   roePercent: number
   realizedPnl: number
-  entryPrice: number
-  closePrice: number
-  roomName: string
-  placementRank: number
 }
 
 export type ProfileShareRoomOption = {
@@ -158,8 +153,12 @@ export type ProfileShareRoomOption = {
   participantId: string
   placementRank: number
   pnlPercent: number
-  defaultSpotlight: ProfileSpotlightTrade | null
-  spotlightCandidates: ProfileSpotlightTrade[]
+  entryCount: number
+  participantCount: number
+  startDateIso: string
+  endDateIso: string
+  isOngoing: boolean
+  topTrades: ProfileShareTradeHighlight[]
 }
 
 export type ProfileDashboardData = {

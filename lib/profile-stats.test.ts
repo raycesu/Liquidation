@@ -5,6 +5,7 @@ import {
   isAccountBusted,
   maxOrNull,
   meanOrNull,
+  pickTopTradesByPnl,
   placementRankForParticipant,
 } from "@/lib/profile-stats"
 
@@ -68,6 +69,45 @@ describe("meanOrNull and maxOrNull", () => {
 
   it("maxOrNull picks max", () => {
     expect(maxOrNull([-2, 5, 3])).toBe(5)
+  })
+})
+
+describe("pickTopTradesByPnl", () => {
+  const baseRow = {
+    room_id: "room-1",
+    symbol: "BTCUSDT",
+    side: "LONG" as const,
+    leverage: 5,
+    margin_allocated: 1000,
+    entry_price: 80_000,
+    close_price: 81_000,
+    room_name: "Test",
+  }
+
+  it("sorts by realized PnL descending and returns at most 3", () => {
+    const rows = [
+      { ...baseRow, trade_id: "t1", realized_pnl: 50 },
+      { ...baseRow, trade_id: "t2", realized_pnl: 300 },
+      { ...baseRow, trade_id: "t3", realized_pnl: 120 },
+      { ...baseRow, trade_id: "t4", realized_pnl: 200 },
+    ]
+
+    const top = pickTopTradesByPnl(rows)
+
+    expect(top).toHaveLength(3)
+    expect(top.map((t) => t.tradeId)).toEqual(["t2", "t4", "t3"])
+  })
+
+  it("skips trades with invalid margin", () => {
+    const rows = [
+      { ...baseRow, trade_id: "t1", realized_pnl: 500, margin_allocated: 0 },
+      { ...baseRow, trade_id: "t2", realized_pnl: 100 },
+    ]
+
+    const top = pickTopTradesByPnl(rows)
+
+    expect(top).toHaveLength(1)
+    expect(top[0]?.tradeId).toBe("t2")
   })
 })
 
