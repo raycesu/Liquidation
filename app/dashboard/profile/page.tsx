@@ -17,7 +17,8 @@ export default async function DashboardProfilePage() {
     redirect("/sign-in")
   }
 
-  const [profileData, headersList] = await Promise.all([loadProfileDashboardData(user.id), headers()])
+  const headersList = await headers()
+  const profileData = await loadProfileDashboardData(user.id)
 
   const host = headersList.get("x-forwarded-host") ?? headersList.get("host") ?? ""
   const proto = headersList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")

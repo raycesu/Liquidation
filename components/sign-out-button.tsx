@@ -1,3 +1,5 @@
+"use client"
+
 import { SignOutButton as ClerkSignOutButton } from "@clerk/nextjs"
 import { Button, type buttonVariants } from "@/components/ui/button"
 import type { VariantProps } from "class-variance-authority"

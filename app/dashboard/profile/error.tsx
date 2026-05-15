@@ -9,7 +9,8 @@ type ProfileErrorProps = {
 }
 
 export default function ProfileError({ error, reset }: ProfileErrorProps) {
-  const showDetails = process.env.NODE_ENV === "development"
+  const detail = error.message?.trim() || error.digest || null
+  const showDetails = process.env.NODE_ENV === "development" && detail
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-6">
@@ -19,7 +20,7 @@ export default function ProfileError({ error, reset }: ProfileErrorProps) {
           We could not load your trading stats. Try again in a moment.
         </p>
         {showDetails ? (
-          <p className="mt-3 break-words text-left text-xs text-muted-foreground">{error.message}</p>
+          <p className="mt-3 break-words text-left text-xs text-muted-foreground">{detail}</p>
         ) : null}
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <Button type="button" onClick={reset}>
