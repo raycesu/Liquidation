@@ -616,6 +616,12 @@ export const OrderEntry = ({
           {submitLabel}
         </Button>
 
+        {orderType === "MARKET" ? (
+          <p className="text-[10px] leading-relaxed text-text-secondary">
+            Fills use the server mark at execution time, which may differ slightly from the live chart price.
+          </p>
+        ) : null}
+
         <div className="space-y-2 rounded-xl border border-border/70 bg-background/35 p-3 text-sm shadow-inner shadow-background/30">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Liquidation Price</span>

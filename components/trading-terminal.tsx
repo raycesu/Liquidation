@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"
+import { toast } from "sonner"
 import type { CheckPendingOrdersResult } from "@/actions/check-pending-orders"
 import type { LiquidateRoomResult } from "@/actions/liquidate"
 import { OrderEntry } from "@/components/order-entry"
@@ -150,9 +151,22 @@ export const TradingTerminal = ({
     setAvailableMargin(payload.availableMargin)
   }
 
+  const lastSkippedSymbolsToastAtRef = useRef(0)
+
   const handleOrdersSynced = useCallback((result: CheckPendingOrdersResult) => {
     if (result.availableMargin != null) {
       setAvailableMargin(result.availableMargin)
+    }
+
+    if (result.skippedSymbols.length > 0) {
+      const now = Date.now()
+
+      if (now - lastSkippedSymbolsToastAtRef.current >= 15_000) {
+        lastSkippedSymbolsToastAtRef.current = now
+        toast.warning(
+          `Order engine skipped ${result.skippedSymbols.join(", ")} — mark price unavailable. Retrying on next poll.`,
+        )
+      }
     }
 
     if (result.newPositions.length > 0) {

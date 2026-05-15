@@ -20,55 +20,11 @@ const isUnderwater = (position: Position, livePrice: number) => {
   return livePrice >= position.liquidation_price
 }
 
-export const runLiquidationEngineForRoom = async (
-  roomId: string,
-  options: { revalidate?: boolean } = {},
-): Promise<ActionResult<RunLiquidationEngineResult>> => {
-  const { revalidate = false } = options
+const liquidatePositionBatch = async (
+  roomPositions: LiquidationPosition[],
+  prices: Record<string, number>,
+) => {
   const sql = getSql()
-  const roomPositions = (await sql`
-    select
-      p.id::text,
-      p.participant_id::text,
-      p.symbol,
-      p.side,
-      p.leverage,
-      p.size::float8 as size,
-      p.margin_allocated::float8 as margin_allocated,
-      p.entry_price::float8 as entry_price,
-      p.liquidation_price::float8 as liquidation_price,
-      p.is_open,
-      p.created_at::text,
-      p.closed_at::text,
-      json_build_object(
-        'id', rp.id::text,
-        'room_id', rp.room_id::text,
-        'available_margin', rp.available_margin::float8
-      ) as room_participants
-    from positions p
-    join room_participants rp on rp.id = p.participant_id
-    where p.is_open = true
-      and rp.room_id = ${roomId}
-  `) as LiquidationPosition[]
-
-  if (roomPositions.length === 0) {
-    return { ok: true, data: { liquidated: 0, liquidatedPositionIds: [] } }
-  }
-
-  const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol))) as SupportedSymbol[]
-  const prices = await fetchMarketPrices(symbols)
-  const updatedAt = new Date().toISOString()
-
-  for (const [symbol, price] of Object.entries(prices)) {
-    await sql`
-      insert into latest_prices (symbol, price, updated_at)
-      values (${symbol}, ${price}, ${updatedAt})
-      on conflict (symbol) do update
-      set price = excluded.price,
-          updated_at = excluded.updated_at
-    `
-  }
-
   let liquidated = 0
   const liquidatedPositionIds: string[] = []
 
@@ -151,11 +107,138 @@ export const runLiquidationEngineForRoom = async (
     liquidatedPositionIds.push(position.id)
   }
 
-  if (revalidate && liquidated > 0) {
+  return { liquidated, liquidatedPositionIds }
+}
+
+const cacheLatestPrices = async (symbols: SupportedSymbol[], prices: Record<string, number>) => {
+  const sql = getSql()
+  const updatedAt = new Date().toISOString()
+
+  for (const symbol of symbols) {
+    const price = prices[symbol]
+
+    if (price == null || !Number.isFinite(price) || price <= 0) {
+      continue
+    }
+
+    await sql`
+      insert into latest_prices (symbol, price, updated_at)
+      values (${symbol}, ${price}, ${updatedAt})
+      on conflict (symbol) do update
+      set price = excluded.price,
+          updated_at = excluded.updated_at
+    `
+  }
+}
+
+const fetchOpenPositionsForRoom = async (roomId: string) => {
+  const sql = getSql()
+
+  return (await sql`
+    select
+      p.id::text,
+      p.participant_id::text,
+      p.symbol,
+      p.side,
+      p.leverage,
+      p.size::float8 as size,
+      p.margin_allocated::float8 as margin_allocated,
+      p.entry_price::float8 as entry_price,
+      p.liquidation_price::float8 as liquidation_price,
+      p.is_open,
+      p.created_at::text,
+      p.closed_at::text,
+      json_build_object(
+        'id', rp.id::text,
+        'room_id', rp.room_id::text,
+        'available_margin', rp.available_margin::float8
+      ) as room_participants
+    from positions p
+    join room_participants rp on rp.id = p.participant_id
+    where p.is_open = true
+      and rp.room_id = ${roomId}
+  `) as LiquidationPosition[]
+}
+
+const fetchOpenPositionsForParticipant = async (roomId: string, participantId: string) => {
+  const sql = getSql()
+
+  return (await sql`
+    select
+      p.id::text,
+      p.participant_id::text,
+      p.symbol,
+      p.side,
+      p.leverage,
+      p.size::float8 as size,
+      p.margin_allocated::float8 as margin_allocated,
+      p.entry_price::float8 as entry_price,
+      p.liquidation_price::float8 as liquidation_price,
+      p.is_open,
+      p.created_at::text,
+      p.closed_at::text,
+      json_build_object(
+        'id', rp.id::text,
+        'room_id', rp.room_id::text,
+        'available_margin', rp.available_margin::float8
+      ) as room_participants
+    from positions p
+    join room_participants rp on rp.id = p.participant_id
+    where p.is_open = true
+      and rp.room_id = ${roomId}
+      and rp.id = ${participantId}
+  `) as LiquidationPosition[]
+}
+
+export const liquidateParticipantPositions = async (
+  roomId: string,
+  participantId: string,
+  options: { revalidate?: boolean } = {},
+): Promise<ActionResult<RunLiquidationEngineResult>> => {
+  const { revalidate = false } = options
+  const roomPositions = await fetchOpenPositionsForParticipant(roomId, participantId)
+
+  if (roomPositions.length === 0) {
+    return { ok: true, data: { liquidated: 0, liquidatedPositionIds: [] } }
+  }
+
+  const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol))) as SupportedSymbol[]
+  const prices = await fetchMarketPrices(symbols)
+  await cacheLatestPrices(symbols, prices)
+
+  const result = await liquidatePositionBatch(roomPositions, prices)
+
+  if (revalidate && result.liquidated > 0) {
     revalidatePath(`/room/${roomId}/trade`)
     revalidatePath(`/room/${roomId}`)
     revalidatePath(`/room/${roomId}/leaderboard`)
   }
 
-  return { ok: true, data: { liquidated, liquidatedPositionIds } }
+  return { ok: true, data: result }
+}
+
+export const runLiquidationEngineForRoom = async (
+  roomId: string,
+  options: { revalidate?: boolean } = {},
+): Promise<ActionResult<RunLiquidationEngineResult>> => {
+  const { revalidate = false } = options
+  const roomPositions = await fetchOpenPositionsForRoom(roomId)
+
+  if (roomPositions.length === 0) {
+    return { ok: true, data: { liquidated: 0, liquidatedPositionIds: [] } }
+  }
+
+  const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol))) as SupportedSymbol[]
+  const prices = await fetchMarketPrices(symbols)
+  await cacheLatestPrices(symbols, prices)
+
+  const result = await liquidatePositionBatch(roomPositions, prices)
+
+  if (revalidate && result.liquidated > 0) {
+    revalidatePath(`/room/${roomId}/trade`)
+    revalidatePath(`/room/${roomId}`)
+    revalidatePath(`/room/${roomId}/leaderboard`)
+  }
+
+  return { ok: true, data: result }
 }

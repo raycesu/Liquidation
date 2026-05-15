@@ -138,12 +138,17 @@ export const runOrderEngineForRoom = async (
         order by o.created_at asc
       `) as PendingOrderRow[])
 
+  const skippedSymbols = new Set<string>()
+  const skippedOrderIds: string[] = []
+
   const emptyResult: RunOrderEngineResult = {
     filledOrderIds: [],
     cancelledOrderIds: [],
     newPositions: [],
     closedPositionIds: [],
     trades: [],
+    skippedSymbols: [],
+    skippedOrderIds: [],
   }
 
   if (orders.length === 0) {
@@ -194,7 +199,18 @@ export const runOrderEngineForRoom = async (
   }
 
   if (symbols.length === 0) {
-    return { ok: true, data: { filledOrderIds, cancelledOrderIds, newPositions, closedPositionIds, trades } }
+    return {
+      ok: true,
+      data: {
+        filledOrderIds,
+        cancelledOrderIds,
+        newPositions,
+        closedPositionIds,
+        trades,
+        skippedSymbols: Array.from(skippedSymbols),
+        skippedOrderIds,
+      },
+    }
   }
 
   const prices = await fetchMarketPrices(symbols)
@@ -211,6 +227,8 @@ export const runOrderEngineForRoom = async (
     const livePrice = prices[order.symbol]
 
     if (livePrice == null || !Number.isFinite(livePrice) || livePrice <= 0) {
+      skippedSymbols.add(order.symbol)
+      skippedOrderIds.push(order.id)
       continue
     }
 
@@ -485,6 +503,8 @@ export const runOrderEngineForRoom = async (
       newPositions,
       closedPositionIds,
       trades,
+      skippedSymbols: Array.from(skippedSymbols),
+      skippedOrderIds,
     },
   }
 }

@@ -3,7 +3,7 @@
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
-import { runLiquidationEngineForRoom } from "@/lib/trading-engine/liquidate"
+import { liquidateParticipantPositions } from "@/lib/trading-engine/liquidate"
 import type { ActionResult } from "@/lib/types"
 
 export type LiquidateRoomResult = {
@@ -38,23 +38,15 @@ export const liquidateRoom = async (roomId: string): Promise<ActionResult<Liquid
     return { ok: false, error: "Forbidden" }
   }
 
-  const engineResult = await runLiquidationEngineForRoom(roomId, { revalidate: true })
+  const engineResult = await liquidateParticipantPositions(roomId, participant.id, {
+    revalidate: false,
+  })
 
   if (!engineResult.ok) {
     return engineResult
   }
 
-  const userLiquidatedPositionIds =
-    engineResult.data.liquidatedPositionIds.length === 0
-      ? []
-      : (
-          (await sql`
-            select id::text
-            from positions
-            where participant_id = ${participant.id}
-              and id = any(${engineResult.data.liquidatedPositionIds})
-          `) as { id: string }[]
-        ).map((row) => row.id)
+  const userLiquidatedPositionIds = engineResult.data.liquidatedPositionIds
 
   const marginRows = (await sql`
     select available_margin::float8 as available_margin

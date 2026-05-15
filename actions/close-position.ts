@@ -95,7 +95,13 @@ export const closePosition = async ({
     return { ok: false, error: "Position is already closed" }
   }
 
-  const finalPrice = await fetchMarketPrice(position.symbol)
+  let finalPrice: number
+
+  try {
+    finalPrice = await fetchMarketPrice(position.symbol)
+  } catch {
+    return { ok: false, error: "Unable to fetch market price. Try again in a moment." }
+  }
   const rawPnl = calculatePnl({
     entryPrice: position.entry_price,
     livePrice: finalPrice,

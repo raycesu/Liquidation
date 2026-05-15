@@ -4,6 +4,7 @@ import { z } from "zod"
 import { runOrderEngineForRoom } from "@/lib/trading-engine/run-order-engine"
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
+import { releaseEnginePoll, tryAcquireEnginePoll } from "@/lib/engine-poll-throttle"
 import type { ActionResult, Position, Trade } from "@/lib/types"
 
 export type CheckPendingOrdersResult = {
@@ -13,6 +14,8 @@ export type CheckPendingOrdersResult = {
   closedPositionIds: string[]
   trades: Trade[]
   availableMargin: number | null
+  skippedSymbols: string[]
+  skippedOrderIds: string[]
 }
 
 export const checkPendingOrders = async ({
@@ -46,31 +49,55 @@ export const checkPendingOrders = async ({
     return { ok: false, error: "Participant not found" }
   }
 
-  const engineResult = await runOrderEngineForRoom(roomId, {
-    participantId: participant.id,
-    revalidate: true,
-  })
+  const pollKey = `${user.id}:${roomId}`
 
-  if (!engineResult.ok) {
-    return engineResult
+  if (!tryAcquireEnginePoll(pollKey)) {
+    return {
+      ok: true,
+      data: {
+        filledOrderIds: [],
+        cancelledOrderIds: [],
+        newPositions: [],
+        closedPositionIds: [],
+        trades: [],
+        availableMargin: null,
+        skippedSymbols: [],
+        skippedOrderIds: [],
+      },
+    }
   }
 
-  const marginRows = (await sql`
-    select available_margin::float8 as available_margin
-    from room_participants
-    where id = ${participant.id}
-    limit 1
-  `) as { available_margin: number }[]
+  try {
+    const engineResult = await runOrderEngineForRoom(roomId, {
+      participantId: participant.id,
+      revalidate: false,
+    })
 
-  return {
-    ok: true,
-    data: {
-      filledOrderIds: engineResult.data.filledOrderIds,
-      cancelledOrderIds: engineResult.data.cancelledOrderIds,
-      newPositions: engineResult.data.newPositions,
-      closedPositionIds: engineResult.data.closedPositionIds,
-      trades: engineResult.data.trades,
-      availableMargin: marginRows[0]?.available_margin ?? null,
-    },
+    if (!engineResult.ok) {
+      return engineResult
+    }
+
+    const marginRows = (await sql`
+      select available_margin::float8 as available_margin
+      from room_participants
+      where id = ${participant.id}
+      limit 1
+    `) as { available_margin: number }[]
+
+    return {
+      ok: true,
+      data: {
+        filledOrderIds: engineResult.data.filledOrderIds,
+        cancelledOrderIds: engineResult.data.cancelledOrderIds,
+        newPositions: engineResult.data.newPositions,
+        closedPositionIds: engineResult.data.closedPositionIds,
+        trades: engineResult.data.trades,
+        availableMargin: marginRows[0]?.available_margin ?? null,
+        skippedSymbols: engineResult.data.skippedSymbols,
+        skippedOrderIds: engineResult.data.skippedOrderIds,
+      },
+    }
+  } finally {
+    releaseEnginePoll(pollKey)
   }
 }

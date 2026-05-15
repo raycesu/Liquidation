@@ -6,6 +6,7 @@ import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomJoinable } from "@/lib/competition-guards"
 import { getSql } from "@/lib/db"
+import { checkRateLimit } from "@/lib/rate-limit"
 import type { ActionResult, Room } from "@/lib/types"
 
 const MAX_ROOM_DESCRIPTION_WORDS = 25
@@ -169,6 +170,16 @@ export const joinRoom = async (joinCode: string): Promise<ActionResult<JoinRoomD
 
   if (!user) {
     return { ok: false, error: "Sign in before joining a room" }
+  }
+
+  const joinRateLimit = checkRateLimit(`join-room:${user.id}`, { maxAttempts: 20, windowMs: 15 * 60_000 })
+
+  if (!joinRateLimit.allowed) {
+    const retryMinutes = Math.max(1, Math.ceil(joinRateLimit.retryAfterMs / 60_000))
+    return {
+      ok: false,
+      error: `Too many join attempts. Try again in about ${retryMinutes} minute${retryMinutes === 1 ? "" : "s"}.`,
+    }
   }
 
   const sql = getSql()

@@ -6,6 +6,8 @@ export type RunOrderEngineResult = {
   newPositions: Position[]
   closedPositionIds: string[]
   trades: Trade[]
+  skippedSymbols: string[]
+  skippedOrderIds: string[]
 }
 
 export type RunOrderEngineOptions = {

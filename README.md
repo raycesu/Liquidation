@@ -121,19 +121,6 @@ curl -X POST "https://YOUR-PRODUCTION-DOMAIN.vercel.app/api/engine/run" \
   -H "Authorization: Bearer YOUR_ENGINE_CRON_SECRET"
 ```
 
-### Optional backup: GitHub Actions
-
-If the repo is on GitHub, `.github/workflows/trading-engine-cron.yml` can call the same endpoint **every 5 minutes** (GitHub’s minimum for scheduled workflows).
-
-Repository **Settings** → **Secrets and variables** → **Actions**:
-
-| Secret | Example |
-|--------|---------|
-| `APP_URL` | `https://your-app.vercel.app` |
-| `ENGINE_CRON_SECRET` | same as Vercel |
-
-You can use cron-job.org alone, GitHub Actions alone, or both (cron-job.org is better for 1-minute cadence).
-
 ## Install and run
 
 ```bash
@@ -202,9 +189,7 @@ Commit the updated generated file when you intentionally change the tradable uni
 | `app/join/[room_id]` | Legacy redirect to dashboard |
 | `app/user-profile/[[...user-profile]]` | Account settings and `/photo` route |
 | `app/api/engine/run` | External cron target: order fills + liquidation |
-| `.github/workflows/trading-engine-cron.yml` | Optional GitHub Actions scheduler (every 5 min) |
-| `actions/run-order-engine.ts` | Room-wide limit / TP / SL processing |
-| `actions/run-trading-engine.ts` | Orchestrates engine pass for active rooms |
+| `lib/trading-engine/*` | Order engine, liquidation, cron orchestration |
 | `hooks/useTradingEngineSync.ts` | Terminal polling (3s) while trade UI is open |
 | `actions/*` | Server Actions (orders, rooms, profile, liquidation) |
 | `components/trading-terminal.tsx` | Chart, ticker, order entry, positions panel |

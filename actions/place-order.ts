@@ -110,7 +110,14 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
 
   const symbol = parsed.data.symbol as SupportedSymbol
   const side = parsed.data.side as PositionSide
-  const entryPrice = await fetchMarketPrice(symbol)
+
+  let entryPrice: number
+
+  try {
+    entryPrice = await fetchMarketPrice(symbol)
+  } catch {
+    return { ok: false, error: "Unable to fetch market price. Try again in a moment." }
+  }
   const liquidationPrice = calculateLiquidationPrice({
     entryPrice,
     leverage: parsed.data.leverage,
