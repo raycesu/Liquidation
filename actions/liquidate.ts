@@ -1,7 +1,7 @@
 "use server"
 
 import { z } from "zod"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { fetchMarketPrices } from "@/lib/pricing"
 import type { ActionResult, Position, SupportedSymbol } from "@/lib/types"
@@ -28,7 +28,7 @@ export const liquidateRoom = async (roomId: string): Promise<ActionResult<{ liqu
     return { ok: false, error: "Invalid room" }
   }
 
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
   if (!user) {
     return { ok: false, error: "You must be signed in" }
   }

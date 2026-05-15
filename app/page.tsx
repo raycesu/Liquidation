@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
-import { currentUser } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 import { MarketingHome } from "@/components/marketing/marketing-home"
+import { needsProfileSetup, requireCurrentUser } from "@/lib/auth"
 import { BRAND_NAME } from "@/lib/brand"
 
 export const metadata: Metadata = {
@@ -11,9 +11,13 @@ export const metadata: Metadata = {
 }
 
 export default async function HomePage() {
-  const user = await currentUser()
+  const user = await requireCurrentUser()
 
   if (user) {
+    if (needsProfileSetup(user)) {
+      redirect("/onboarding")
+    }
+
     redirect("/dashboard")
   }
 

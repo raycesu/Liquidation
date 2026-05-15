@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { TradingTerminal } from "@/components/trading-terminal"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import type { PendingOrder, Position, RoomParticipant, Trade } from "@/lib/types"
 
@@ -14,7 +14,7 @@ type TradePageProps = {
 
 export default async function TradePage({ params }: TradePageProps) {
   const { room_id: roomId } = await params
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
 
   if (!user) {
     redirect("/sign-in")

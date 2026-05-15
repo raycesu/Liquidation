@@ -8,6 +8,7 @@ export type UserProfile = {
   email: string
   username: string
   image_url: string | null
+  profile_setup_completed_at: string | null
   created_at: string
 }
 

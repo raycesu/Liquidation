@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { fetchMarketPrice } from "@/lib/pricing"
 import { getSql } from "@/lib/db"
 import { calculatePnl, floorRealizedPnl } from "@/lib/perpetuals"
@@ -37,7 +37,7 @@ export const closePosition = async ({
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" }
   }
 
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
 
   if (!user) {
     return { ok: false, error: "You must be signed in to close a position" }

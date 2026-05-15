@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { ChevronLeft } from "lucide-react"
 import { PnlLeaderboardSection } from "@/components/room/pnl-leaderboard-section"
 import { Button } from "@/components/ui/button"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { getRankedParticipants, paginateRankedParticipants, parseLeaderboardPage } from "@/lib/room-leaderboard"
 import type { ParticipantWithUser } from "@/lib/types"
@@ -22,7 +22,7 @@ type LeaderboardPageProps = {
 export default async function LeaderboardPage({ params, searchParams }: LeaderboardPageProps) {
   const { room_id: roomId } = await params
   const search = await searchParams
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
 
   if (!user) {
     redirect("/sign-in")

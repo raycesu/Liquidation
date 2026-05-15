@@ -5,6 +5,7 @@ create table if not exists public.users (
   email text not null,
   username text not null,
   image_url text,
+  profile_setup_completed_at timestamptz,
   created_at timestamptz not null default now()
 );
 

@@ -1,4 +1,3 @@
-import { currentUser } from "@clerk/nextjs/server"
 import Image from "next/image"
 import Link from "next/link"
 import { headers } from "next/headers"
@@ -10,7 +9,7 @@ import { ProfileTradingStyleCard } from "@/components/profile-trading-style-card
 import { SignOutButton } from "@/components/sign-out-button"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { BRAND_LOGO_HEIGHT, BRAND_LOGO_SRC, BRAND_LOGO_WIDTH, BRAND_NAME } from "@/lib/brand"
 import { formatPercent } from "@/lib/format"
 import { loadProfileDashboardData } from "@/lib/profile-stats"
@@ -18,23 +17,19 @@ import { loadProfileDashboardData } from "@/lib/profile-stats"
 export const dynamic = "force-dynamic"
 
 export default async function DashboardProfilePage() {
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
 
   if (!user) {
     redirect("/sign-in")
   }
 
-  const [clerkUser, profileData, headersList] = await Promise.all([
-    currentUser(),
-    loadProfileDashboardData(user.id),
-    headers(),
-  ])
+  const [profileData, headersList] = await Promise.all([loadProfileDashboardData(user.id), headers()])
 
   const host = headersList.get("x-forwarded-host") ?? headersList.get("host") ?? ""
   const proto = headersList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")
   const assetBaseUrl = host ? `${proto}://${host}` : ""
 
-  const avatarUrl = clerkUser?.imageUrl ?? null
+  const avatarUrl = user.image_url
   const summary = profileData.summary
 
   return (
@@ -88,7 +83,7 @@ export default async function DashboardProfilePage() {
             <div>
               <CardTitle className="text-2xl text-text-primary">{user.username}</CardTitle>
               <p className="mt-1 text-sm text-text-secondary">
-                Edit your username and upload an avatar from your profile settings.
+                Edit your username or change your profile photo below.
               </p>
               <ProfileSettingsForm username={user.username} />
             </div>

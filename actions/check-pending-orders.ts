@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrices } from "@/lib/pricing"
 import { getSql } from "@/lib/db"
@@ -48,7 +48,7 @@ export const checkPendingOrders = async ({
     return { ok: false, error: "Invalid room id" }
   }
 
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
 
   if (!user) {
     return { ok: false, error: "You must be signed in" }

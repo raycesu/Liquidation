@@ -3,6 +3,10 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { DevWarningFilter } from "@/components/dev-warning-filter"
 import { Toaster } from "@/components/ui/sonner"
+import {
+  CLERK_SIGN_IN_PATH,
+  CLERK_SIGN_UP_PATH,
+} from "@/lib/clerk-routes"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -29,7 +33,7 @@ type RootLayoutProps = Readonly<{
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <ClerkProvider>
+    <ClerkProvider signInUrl={CLERK_SIGN_IN_PATH} signUpUrl={CLERK_SIGN_UP_PATH}>
       <html
         lang="en"
         data-scroll-behavior="smooth"

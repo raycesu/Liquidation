@@ -3,7 +3,7 @@ import { CreateRoomDialog } from "@/components/create-room-dialog"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { JoinRoomDialog } from "@/components/join-room-dialog"
 import { RoomCard } from "@/components/room-card"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import type { Room } from "@/lib/types"
 
@@ -15,7 +15,7 @@ type DashboardParticipant = {
 }
 
 export default async function DashboardPage() {
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
 
   if (!user) {
     redirect("/sign-in")

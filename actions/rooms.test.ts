@@ -1,9 +1,9 @@
 import { joinRoom } from "@/actions/rooms"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 
 jest.mock("@/lib/auth", () => ({
-  requireCurrentUser: jest.fn(),
+  requireOnboardedUser: jest.fn(),
 }))
 
 jest.mock("@/lib/db", () => ({
@@ -19,7 +19,7 @@ jest.mock("next/navigation", () => ({
 }))
 
 describe("joinRoom", () => {
-  const requireCurrentUserMock = jest.mocked(requireCurrentUser)
+  const requireOnboardedUserMock = jest.mocked(requireOnboardedUser)
   const getSqlMock = jest.mocked(getSql)
 
   beforeEach(() => {
@@ -30,15 +30,16 @@ describe("joinRoom", () => {
     const result = await joinRoom("room-id")
 
     expect(result.ok).toBe(false)
-    expect(requireCurrentUserMock).not.toHaveBeenCalled()
+    expect(requireOnboardedUserMock).not.toHaveBeenCalled()
   })
 
   it("normalizes codes before looking up the room and joining it", async () => {
-    requireCurrentUserMock.mockResolvedValue({
+    requireOnboardedUserMock.mockResolvedValue({
       id: "user_1",
       email: "trader@example.com",
       username: "rayce",
       image_url: null,
+      profile_setup_completed_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
     })
 
@@ -56,11 +57,12 @@ describe("joinRoom", () => {
   })
 
   it("returns an error when the code does not match a room", async () => {
-    requireCurrentUserMock.mockResolvedValue({
+    requireOnboardedUserMock.mockResolvedValue({
       id: "user_1",
       email: "trader@example.com",
       username: "rayce",
       image_url: null,
+      profile_setup_completed_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
     })
 

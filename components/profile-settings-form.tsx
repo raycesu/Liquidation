@@ -59,10 +59,10 @@ export const ProfileSettingsForm = ({ username }: ProfileSettingsFormProps) => {
 
       <div className="rounded-md border border-border bg-background/30 p-3">
         <p className="text-sm text-text-secondary">
-          Want to upload a custom avatar image? Manage your Clerk profile photo.
+          Profile photos appear on competition leaderboards. Manage your photo in account settings.
         </p>
         <Button className="mt-3" variant="outline" asChild>
-          <Link href="/user-profile">Upload avatar image</Link>
+          <Link href="/user-profile?redirect_url=/dashboard/profile">Change profile photo</Link>
         </Button>
       </div>
     </div>

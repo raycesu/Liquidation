@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import type { ActionResult, Room } from "@/lib/types"
 
@@ -92,7 +92,7 @@ export const createRoom = async (
     return { ok: false, error: "End date must be in the future" }
   }
 
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
 
   if (!user) {
     return { ok: false, error: "You must be signed in to create a room" }
@@ -164,7 +164,7 @@ export const joinRoom = async (joinCode: string): Promise<ActionResult<JoinRoomD
     return { ok: false, error: parsedJoinCode.error.issues[0]?.message ?? "Invalid room code" }
   }
 
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
 
   if (!user) {
     return { ok: false, error: "Sign in before joining a room" }

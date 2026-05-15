@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { getMaxLeverage, isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrice } from "@/lib/pricing"
@@ -62,7 +62,7 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid order" }
   }
 
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
 
   if (!user) {
     return { ok: false, error: "You must be signed in to trade" }

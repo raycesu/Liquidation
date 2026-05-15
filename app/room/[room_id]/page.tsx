@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { PnlLeaderboardSection } from "@/components/room/pnl-leaderboard-section"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { formatWholeUsd } from "@/lib/format"
 import { getRankedParticipants, paginateRankedParticipants, parseLeaderboardPage } from "@/lib/room-leaderboard"
@@ -108,7 +108,7 @@ const DetailCard = ({ label, value }: RoomDetail) => (
 export default async function RoomPage({ params, searchParams }: RoomPageProps) {
   const { room_id: roomId } = await params
   const search = await searchParams
-  const user = await requireCurrentUser()
+  const user = await requireOnboardedUser()
 
   if (!user) {
     redirect("/sign-in")

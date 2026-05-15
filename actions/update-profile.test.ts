@@ -1,9 +1,9 @@
 import { updateProfile } from "@/actions/update-profile"
-import { requireCurrentUser } from "@/lib/auth"
+import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 
 jest.mock("@/lib/auth", () => ({
-  requireCurrentUser: jest.fn(),
+  requireOnboardedUser: jest.fn(),
 }))
 
 jest.mock("@/lib/db", () => ({
@@ -15,7 +15,7 @@ jest.mock("next/cache", () => ({
 }))
 
 describe("updateProfile", () => {
-  const requireCurrentUserMock = jest.mocked(requireCurrentUser)
+  const requireOnboardedUserMock = jest.mocked(requireOnboardedUser)
   const getSqlMock = jest.mocked(getSql)
 
   beforeEach(() => {
@@ -31,11 +31,12 @@ describe("updateProfile", () => {
   })
 
   it("returns taken error when username conflicts", async () => {
-    requireCurrentUserMock.mockResolvedValue({
+    requireOnboardedUserMock.mockResolvedValue({
       id: "user_1",
       email: "trader@example.com",
       username: "rayce",
       image_url: null,
+      profile_setup_completed_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
     })
 
