@@ -340,7 +340,17 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     ]
 
   const symbols = Array.from(new Set(openPositions.map((p) => p.symbol))) as SupportedSymbol[]
-  const prices = symbols.length > 0 ? await fetchMarketPrices(symbols) : {}
+  let prices: Partial<Record<SupportedSymbol, number>> = {}
+
+  if (symbols.length > 0) {
+    try {
+      prices = await fetchMarketPrices(symbols)
+    } catch {
+      // Live quotes are optional for profile stats; margin-only equity still renders.
+      prices = {}
+    }
+  }
+
   const unrealizedByParticipant = buildUnrealizedByParticipant(openPositions, prices)
 
   const openByParticipant = new Map<string, boolean>()

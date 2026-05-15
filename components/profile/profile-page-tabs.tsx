@@ -1,7 +1,8 @@
 "use client"
 
+import { useState } from "react"
+import dynamic from "next/dynamic"
 import { ProfileCompetitionTable } from "@/components/profile-competition-table"
-import { ProfileShareCardSection } from "@/components/profile-share-card"
 import { ProfileTradingStatsPanel } from "@/components/profile/profile-trading-stats-panel"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
@@ -11,6 +12,19 @@ import type {
   ProfileSummaryStats,
   ProfileTradingStyle,
 } from "@/lib/types"
+
+const ProfileShareCardSection = dynamic(
+  () =>
+    import("@/components/profile-share-card").then((module) => ({
+      default: module.ProfileShareCardSection,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-sm text-text-secondary">Loading share card…</p>
+    ),
+  },
+)
 
 type ProfilePageTabsProps = {
   summary: ProfileSummaryStats
@@ -37,8 +51,10 @@ export const ProfilePageTabs = ({
   shareRoomOptions,
   assetBaseUrl,
 }: ProfilePageTabsProps) => {
+  const [activeTab, setActiveTab] = useState("stats")
+
   return (
-    <Tabs defaultValue="stats" className="w-full">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <nav aria-label="Profile sections" className="w-full border-b border-white/10">
         <div className="overflow-x-auto overflow-y-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabsList
@@ -67,7 +83,9 @@ export const ProfilePageTabs = ({
       </TabsContent>
 
       <TabsContent value="share" className="mt-6 outline-none">
-        <ProfileShareCardSection shareRoomOptions={shareRoomOptions} assetBaseUrl={assetBaseUrl} />
+        {activeTab === "share" ? (
+          <ProfileShareCardSection shareRoomOptions={shareRoomOptions} assetBaseUrl={assetBaseUrl} />
+        ) : null}
       </TabsContent>
     </Tabs>
   )
