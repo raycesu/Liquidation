@@ -2,16 +2,23 @@
 
 Paper-trading competition platform for perpetual-style markets. Competitors join rooms with a shared virtual balance, trade with leverage against live prices, and are ranked on equity and performance. Built with **Next.js 16** (App Router), **React 19**, **Clerk**, **Neon Postgres**, **Tailwind CSS**, and **shadcn/ui**.
 
-The home route shows a marketing landing page for signed-out users and redirects signed-in users to `/dashboard`. Protected routes redirect unauthenticated visitors to Clerk sign-in.
+Signed-out visitors see a **marketing landing page** at `/`. Signed-in users without a completed profile are sent to **`/onboarding`** to choose a username (and optionally set a profile photo); everyone else lands on **`/dashboard`**. Protected routes redirect unauthenticated visitors to Clerk sign-in.
 
 ## Features
 
+### Marketing and auth
+
+- **Landing page** — Full-viewport marketing hero and nav for signed-out users (`components/marketing/*`).
+- **Custom sign-in / sign-up** — Branded glass-card flows with email/password and **Google OAuth** (`components/auth/*`), plus SSO callback routes under `app/sign-in/sso-callback` and `app/sign-up/sso-callback`.
+- **Onboarding** — After first sign-up, users complete **`/onboarding`**: username (with suggestions and case-insensitive uniqueness) and optional avatar before entering the app. `requireOnboardedUser()` enforces this on dashboard, room, and trade routes.
+
 ### Competitions and social layer
 
-- **Dashboard** — See every room you participate in, available margin, and total equity per competition.
-- **Rooms** — Create competitions with name, schedule, starting balance, and active state; open the lobby for participants and leaderboard.
-- **Join flow** — Enter a six-character room code from the dashboard; lobby participants can share the displayed code.
-- **Leaderboard** — Rankings by equity and performance within a room.
+- **Dashboard** — Room cards with available margin, equity, competition status, and quick actions to create or join a room.
+- **Rooms** — Create competitions with name, optional **description**, schedule, starting balance, and active state. Each room gets a unique **six-character join code** (e.g. `A1B2C3`) shown in the lobby.
+- **Join flow** — Enter a join code from the dashboard **Join room** dialog; the lobby displays the code for participants to share. Legacy `/join/[room_id]` redirects to the dashboard.
+- **Room lobby** — Competition metadata, join code, description, status (upcoming / active / ended), and an embedded **PnL leaderboard** preview with a link to the full leaderboard page.
+- **Leaderboard** — Dedicated `/room/[room_id]/leaderboard` page with paginated rankings by equity and performance.
 
 ### Trading terminal
 
@@ -22,19 +29,20 @@ The home route shows a marketing landing page for signed-out users and redirects
 - **Positions** — Open positions with live mark context, close positions, and attach or edit **TP/SL triggers** on existing positions.
 - **Open orders** — Pending limit and trigger orders with cancel support.
 - **Trade history** — Fills and realized PnL for the current room participant.
-- **Order watcher** — Server-side checks for pending limits and triggers as prices move; **liquidation** logic uses live marks when positions cross liquidation price.
+- **Order watcher** — Server-side checks for pending limits and triggers as prices move (`lib/trading-rules.ts`); **liquidation** uses live marks when positions cross liquidation price.
 
-### Profile
+### Profile and account
 
-- **`/dashboard/profile`** — Cross-room summary, per-room competition breakdown, trading-style insights, and a **share card** (export-friendly summary).
+- **`/dashboard/profile`** — Tabbed experience: **Trading Stats** (summary metrics and trading-style visuals), **Competition History**, and **Share Trades** (export-friendly share card via `html-to-image`).
 - **Profile settings** — Update username with validation and case-insensitive uniqueness checks.
-- **`/user-profile`** — Clerk-managed account page for avatar and account-level profile details.
+- **`/user-profile`** — Clerk account and security settings in a custom shell; **`/user-profile/photo`** for profile photo upload and sync to the app database.
 
 ### Developer experience
 
-- **Server Actions** for trading and room operations (place/cancel orders, close positions, triggers, pending-order checks, liquidation).
+- **Server Actions** for trading, rooms, profile onboarding, and order/liquidation engine helpers.
 - **Zod** validation, **Jest** + Testing Library for unit and component tests.
 - **TypeScript** throughout.
+- **Trading engine cron API** — `POST /api/engine/run` (secured with `ENGINE_CRON_SECRET`) fills limits/TP/SL and liquidates underwater positions across all active rooms. Vercel Cron is configured in `vercel.json` (every minute). The terminal also polls every 3s while open for low-latency fills.
 
 ## Stack
 
@@ -42,17 +50,18 @@ The home route shows a marketing landing page for signed-out users and redirects
 |------|--------|
 | Framework | Next.js 16, App Router |
 | UI | React 19, Tailwind CSS 4, shadcn/ui, Radix, Sonner |
-| Auth | Clerk (`@clerk/nextjs`) |
+| Auth | Clerk (`@clerk/nextjs`), custom sign-in/up UI |
 | Database | Neon serverless Postgres (`@neondatabase/serverless`) |
 | Market catalog | Generated from Hyperliquid + Binance (`npm run markets:refresh`) |
 | Live ticks | Binance futures WebSocket (client hook) |
 | Server pricing helpers | `lib/pricing.ts`, `lib/hyperliquid.ts` |
+| Share cards | `html-to-image` |
 
 ## Prerequisites
 
 - **Node.js** 20 or newer (22+ recommended for Next.js 16)
 - **npm**
-- A **Clerk** application
+- A **Clerk** application (email/password and Google OAuth if you use the bundled Google button)
 - A **Neon** (or compatible Postgres) database
 
 ## Environment variables
@@ -70,7 +79,11 @@ Required variables (see `.env.example` for the canonical list):
 - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
 - `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
 - `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/dashboard`
-- `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/dashboard`
+- `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/onboarding`
+
+Optional:
+
+- `ENGINE_CRON_SECRET` — Bearer token for `POST /api/engine/run` (set the same value in your cron job’s `Authorization: Bearer …` header)
 
 ## Install and run
 
@@ -79,7 +92,7 @@ npm install
 npm run dev
 ```
 
-App: [http://localhost:3000](http://localhost:3000) (redirects to `/dashboard` when signed in).
+App: [http://localhost:3000](http://localhost:3000) (marketing when signed out; `/onboarding` or `/dashboard` when signed in, depending on profile setup).
 
 ```bash
 npm run build    # production build
@@ -93,16 +106,27 @@ npm run test:watch
 ## Authentication
 
 1. Create an application in the [Clerk Dashboard](https://dashboard.clerk.com/).
-2. Copy the publishable and secret keys into `.env.local`.
-3. Sign-in and sign-up routes live under `app/sign-in/[[...sign-in]]` and `app/sign-up/[[...sign-up]]`.
-4. Protected routes (`/dashboard`, `/room`, and legacy `/join`) use Clerk in **`proxy.ts`** (middleware matcher).
+2. Enable the sign-in methods you need (email/password, Google, etc.) and copy keys into `.env.local`.
+3. Sign-in and sign-up routes use custom forms under `app/sign-in/[[...sign-in]]` and `app/sign-up/[[...sign-up]]` (`components/auth/sign-in-form.tsx`, `sign-up-form.tsx`).
+4. New users are redirected to **`/onboarding`** after sign-up to set a public username before using dashboard or rooms.
+5. Protected routes (`/dashboard`, `/room`, `/join`, `/onboarding`) use Clerk in **`proxy.ts`** (middleware matcher).
 
 ## Database
 
 - **Base schema:** `neon/schema.sql` — apply first on a fresh database.
-- **Migrations:** `neon/migrations/` — e.g. `002_expand_markets.sql` widens symbol/leverage constraints for the expanded Hyperliquid-aligned market set, and `003_users_username_case_insensitive_unique.sql` enforces case-insensitive username uniqueness.
+- **Migrations:** `neon/migrations/` — apply in filename order after the base schema:
 
-Apply with your Neon workflow, `psql`, or any SQL client. Order matters: schema first, then migrations in filename order if you maintain history that way.
+| Migration | Purpose |
+|-----------|---------|
+| `002_expand_markets.sql` | Wider symbol/leverage constraints for the Hyperliquid-aligned market set |
+| `003_users_username_case_insensitive_unique.sql` | Case-insensitive unique usernames |
+| `004_remove_reduce_only.sql` | Schema cleanup for order flags |
+| `005_add_user_image_url.sql` | Profile image URL on `users` |
+| `006_profile_setup_completed.sql` | `profile_setup_completed_at` for onboarding gate |
+| `006_add_room_join_codes.sql` | Unique six-character `join_code` per room |
+| `007_add_room_description.sql` | Optional `description` on rooms |
+
+Apply with your Neon workflow, `psql`, or any SQL client. Order matters: schema first, then migrations in filename order.
 
 ## Market list refresh
 
@@ -118,17 +142,32 @@ Commit the updated generated file when you intentionally change the tradable uni
 
 | Path | Role |
 |------|------|
-| `app/dashboard` | Room list, profile |
-| `app/dashboard/profile` | Profile analytics, settings, and share card |
-| `app/room/[room_id]` | Lobby, leaderboard |
-| `app/room/[room_id]/trade` | Trading terminal (server-loaded positions, orders, trades) |
-| `app/join/[room_id]` | Legacy join route redirect |
-| `app/user-profile/[[...user-profile]]` | Clerk user profile management route |
-| `actions/*` | Server Actions for trading, rooms, profile helpers |
+| `app/page.tsx` | Marketing home (signed out) or redirect to onboarding/dashboard |
+| `app/onboarding` | First-run username and profile setup |
+| `app/sign-in`, `app/sign-up` | Custom auth UI and SSO callbacks |
+| `app/dashboard` | Room list, join/create dialogs |
+| `app/dashboard/profile` | Profile tabs: stats, history, share |
+| `app/room/[room_id]` | Lobby, join code, leaderboard preview |
+| `app/room/[room_id]/leaderboard` | Full paginated leaderboard |
+| `app/room/[room_id]/trade` | Trading terminal |
+| `app/join/[room_id]` | Legacy redirect to dashboard |
+| `app/user-profile/[[...user-profile]]` | Account settings and `/photo` route |
+| `app/api/engine/run` | Cron: order fills + liquidation for all active rooms |
+| `actions/run-order-engine.ts` | Room-wide limit / TP / SL processing |
+| `actions/run-trading-engine.ts` | Orchestrates engine pass for active rooms |
+| `hooks/useTradingEngineSync.ts` | Terminal polling (3s) while trade UI is open |
+| `actions/*` | Server Actions (orders, rooms, profile, liquidation) |
 | `components/trading-terminal.tsx` | Chart, ticker, order entry, positions panel |
+| `components/marketing/*` | Landing page shell |
+| `components/auth/*` | Sign-in, sign-up, OAuth |
+| `components/profile/*` | Profile page tabs and trading-style visuals |
+| `components/room/pnl-leaderboard-section.tsx` | Shared lobby/full leaderboard UI |
+| `lib/auth.ts` | `requireCurrentUser`, `requireOnboardedUser`, profile setup gate |
 | `lib/markets.ts` / `lib/markets.generated.ts` | Tradable markets and metadata |
 | `lib/perpetuals.ts` | Margin, liquidation price, sizing helpers |
+| `lib/trading-rules.ts` | Limit and trigger fill logic |
 | `hooks/useBinanceTicker.ts` | Client Binance `!ticker@arr` subscription |
+| `proxy.ts` | Clerk middleware and protected route matcher |
 
 ## License
 

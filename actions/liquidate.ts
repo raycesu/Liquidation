@@ -1,10 +1,22 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { fetchMarketPrices } from "@/lib/pricing"
 import type { ActionResult, Position, SupportedSymbol } from "@/lib/types"
+
+export type LiquidateRoomResult = {
+  liquidated: number
+  liquidatedPositionIds: string[]
+  availableMargin: number | null
+}
+
+export type RunLiquidationEngineResult = {
+  liquidated: number
+  liquidatedPositionIds: string[]
+}
 
 type LiquidationPosition = Position & {
   room_participants: {
@@ -22,7 +34,7 @@ const isUnderwater = (position: Position, livePrice: number) => {
   return livePrice >= position.liquidation_price
 }
 
-export const liquidateRoom = async (roomId: string): Promise<ActionResult<{ liquidated: number }>> => {
+export const liquidateRoom = async (roomId: string): Promise<ActionResult<LiquidateRoomResult>> => {
   const parsed = z.string().uuid().safeParse(roomId)
   if (!parsed.success) {
     return { ok: false, error: "Invalid room" }
@@ -42,16 +54,52 @@ export const liquidateRoom = async (roomId: string): Promise<ActionResult<{ liqu
     limit 1
   `) as { id: string }[]
 
-  if (!membershipRows[0]) {
+  const participant = membershipRows[0]
+
+  if (!participant) {
     return { ok: false, error: "Forbidden" }
   }
 
-  return runLiquidationEngineForRoom(roomId)
+  const engineResult = await runLiquidationEngineForRoom(roomId, { revalidate: true })
+
+  if (!engineResult.ok) {
+    return engineResult
+  }
+
+  const userLiquidatedPositionIds =
+    engineResult.data.liquidatedPositionIds.length === 0
+      ? []
+      : (
+          (await sql`
+            select id::text
+            from positions
+            where participant_id = ${participant.id}
+              and id = any(${engineResult.data.liquidatedPositionIds})
+          `) as { id: string }[]
+        ).map((row) => row.id)
+
+  const marginRows = (await sql`
+    select available_margin::float8 as available_margin
+    from room_participants
+    where id = ${participant.id}
+    limit 1
+  `) as { available_margin: number }[]
+
+  return {
+    ok: true,
+    data: {
+      liquidated: userLiquidatedPositionIds.length,
+      liquidatedPositionIds: userLiquidatedPositionIds,
+      availableMargin: marginRows[0]?.available_margin ?? null,
+    },
+  }
 }
 
 export const runLiquidationEngineForRoom = async (
   roomId: string,
-): Promise<ActionResult<{ liquidated: number }>> => {
+  options: { revalidate?: boolean } = {},
+): Promise<ActionResult<RunLiquidationEngineResult>> => {
+  const { revalidate = false } = options
   const sql = getSql()
   const roomPositions = (await sql`
     select
@@ -79,7 +127,7 @@ export const runLiquidationEngineForRoom = async (
   `) as LiquidationPosition[]
 
   if (roomPositions.length === 0) {
-    return { ok: true, data: { liquidated: 0 } }
+    return { ok: true, data: { liquidated: 0, liquidatedPositionIds: [] } }
   }
 
   const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol))) as SupportedSymbol[]
@@ -97,6 +145,7 @@ export const runLiquidationEngineForRoom = async (
   }
 
   let liquidated = 0
+  const liquidatedPositionIds: string[] = []
 
   for (const position of roomPositions) {
     const livePrice = prices[position.symbol]
@@ -166,7 +215,14 @@ export const runLiquidationEngineForRoom = async (
     `
 
     liquidated += 1
+    liquidatedPositionIds.push(position.id)
   }
 
-  return { ok: true, data: { liquidated } }
+  if (revalidate && liquidated > 0) {
+    revalidatePath(`/room/${roomId}/trade`)
+    revalidatePath(`/room/${roomId}`)
+    revalidatePath(`/room/${roomId}/leaderboard`)
+  }
+
+  return { ok: true, data: { liquidated, liquidatedPositionIds } }
 }

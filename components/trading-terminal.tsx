@@ -1,7 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState, type ReactNode } from "react"
+import { useCallback, useMemo, useState, type ReactNode } from "react"
+import type { CheckPendingOrdersResult } from "@/actions/check-pending-orders"
+import type { LiquidateRoomResult } from "@/actions/liquidate"
 import { OrderEntry } from "@/components/order-entry"
 import { PositionsPanel } from "@/components/positions-panel"
 import { TradingViewChart } from "@/components/tradingview-chart"
@@ -9,6 +11,7 @@ import { AssetSelector } from "@/components/asset-selector"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useBinanceTicker } from "@/hooks/useBinanceTicker"
+import { useTradingEngineSync } from "@/hooks/useTradingEngineSync"
 import { formatCompactUsd, formatNumber, formatPercent } from "@/lib/format"
 import { defaultMarketSymbol, getMarket } from "@/lib/markets"
 import { cn } from "@/lib/utils"
@@ -146,6 +149,73 @@ export const TradingTerminal = ({
     )
     setAvailableMargin(payload.availableMargin)
   }
+
+  const handleOrdersSynced = useCallback((result: CheckPendingOrdersResult) => {
+    if (result.availableMargin != null) {
+      setAvailableMargin(result.availableMargin)
+    }
+
+    if (result.newPositions.length > 0) {
+      setPositions((current) => [...result.newPositions, ...current])
+    }
+
+    if (result.closedPositionIds.length > 0) {
+      const closedSet = new Set(result.closedPositionIds)
+      setPositions((current) => current.filter((position) => !closedSet.has(position.id)))
+    }
+
+    if (result.filledOrderIds.length > 0 || result.cancelledOrderIds.length > 0) {
+      const filledSet = new Set(result.filledOrderIds)
+      const cancelledSet = new Set(result.cancelledOrderIds)
+      const now = new Date().toISOString()
+
+      setPendingOrders((current) =>
+        current.map((order) => {
+          if (filledSet.has(order.id)) {
+            return { ...order, status: "FILLED", filled_at: now }
+          }
+
+          if (cancelledSet.has(order.id)) {
+            return { ...order, status: "CANCELLED", cancelled_at: now }
+          }
+
+          return order
+        }),
+      )
+    }
+
+    if (result.trades.length > 0) {
+      setTrades((current) => [...result.trades, ...current])
+    }
+  }, [])
+
+  const handleLiquidationSynced = useCallback((result: LiquidateRoomResult) => {
+    if (result.availableMargin != null) {
+      setAvailableMargin(result.availableMargin)
+    }
+
+    if (result.liquidatedPositionIds.length === 0) {
+      return
+    }
+
+    const liquidatedSet = new Set(result.liquidatedPositionIds)
+    const now = new Date().toISOString()
+
+    setPositions((current) => current.filter((position) => !liquidatedSet.has(position.id)))
+    setPendingOrders((current) =>
+      current.map((order) =>
+        order.position_id && liquidatedSet.has(order.position_id) && order.status === "PENDING"
+          ? { ...order, status: "CANCELLED", cancelled_at: now }
+          : order,
+      ),
+    )
+  }, [])
+
+  useTradingEngineSync({
+    roomId,
+    onOrdersSynced: handleOrdersSynced,
+    onLiquidationSynced: handleLiquidationSynced,
+  })
 
   const changeLabel =
     selectedStats == null
