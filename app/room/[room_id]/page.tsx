@@ -1,15 +1,15 @@
-import Image from "next/image"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import type { ReactNode } from "react"
-import { ArrowUpRight, BarChart3, CalendarDays, DoorOpen, Trophy, Users } from "lucide-react"
+import { ArrowUpRight, BarChart3, DoorOpen, Trophy } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
+import { PnlLeaderboardSection } from "@/components/room/pnl-leaderboard-section"
 import { requireCurrentUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { formatWholeUsd } from "@/lib/format"
+import { getRankedParticipants, paginateRankedParticipants, parseLeaderboardPage } from "@/lib/room-leaderboard"
 import type { ParticipantWithUser, Room, RoomParticipant } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -18,6 +18,9 @@ type RoomPageProps = {
   params: Promise<{
     room_id: string
   }>
+  searchParams?: Promise<{
+    page?: string | string[]
+  }>
 }
 
 type RoomStatus = "upcoming" | "active" | "ended"
@@ -25,31 +28,6 @@ type RoomStatus = "upcoming" | "active" | "ended"
 type RoomDetail = {
   label: string
   value: ReactNode
-}
-
-const getInitials = (username: string) =>
-  username
-    .split(/[\s-_]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "TR"
-
-const formatCompetitionDateTime = (iso: string) => {
-  const date = new Date(iso)
-
-  if (Number.isNaN(date.getTime())) {
-    return iso
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  }).format(date)
 }
 
 const formatCompetitionDateParts = (iso: string) => {
@@ -127,8 +105,9 @@ const DetailCard = ({ label, value }: RoomDetail) => (
   </Card>
 )
 
-export default async function RoomPage({ params }: RoomPageProps) {
+export default async function RoomPage({ params, searchParams }: RoomPageProps) {
   const { room_id: roomId } = await params
+  const search = await searchParams
   const user = await requireCurrentUser()
 
   if (!user) {
@@ -200,6 +179,8 @@ export default async function RoomPage({ params }: RoomPageProps) {
   const roomDescription = room.description?.trim()
   const startDate = formatCompetitionDateParts(room.start_date)
   const endDate = formatCompetitionDateParts(room.end_date)
+  const rankedParticipants = await getRankedParticipants(room.id, participants)
+  const leaderboardPage = paginateRankedParticipants(rankedParticipants, parseLeaderboardPage(search?.page))
   const details: RoomDetail[] = [
     {
       label: "Starting balance",
@@ -270,17 +251,6 @@ export default async function RoomPage({ params }: RoomPageProps) {
               </Button>
               <Button
                 asChild
-                variant="outline"
-                size="lg"
-                className="h-11 rounded-full border-border/70 bg-background/35 px-5 text-text-primary shadow-lg shadow-accent-blue/5 backdrop-blur transition-colors hover:border-accent-neon/45 hover:bg-surface-elevated hover:text-white dark:bg-background/35 dark:hover:bg-surface-elevated"
-              >
-                <Link href={`/room/${room.id}/leaderboard`}>
-                  <Trophy className="size-4" aria-hidden />
-                  Leaderboard
-                </Link>
-              </Button>
-              <Button
-                asChild
                 size="lg"
                 className="h-11 rounded-full bg-gradient-to-r from-accent-blue to-accent-neon px-5 font-semibold text-background shadow-lg shadow-accent-blue/25 transition-transform hover:translate-y-[-1px] hover:shadow-accent-blue/35"
               >
@@ -300,78 +270,11 @@ export default async function RoomPage({ params }: RoomPageProps) {
           ))}
         </section>
 
-        <Card className="overflow-hidden border-border/60 bg-surface/70 shadow-2xl shadow-accent-blue/5 backdrop-blur-xl">
-          <CardHeader className="gap-3 border-b border-border/40 px-5 py-5 sm:flex sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="font-heading text-2xl font-semibold tracking-[-0.03em] text-text-primary">
-              Participants
-            </CardTitle>
-            <Badge
-              variant="outline"
-              className="h-8 w-fit gap-2 rounded-full border-accent-neon/35 bg-accent-neon/10 px-3 text-sm font-semibold text-accent-neon"
-            >
-              <Users className="size-3.5" aria-hidden />
-              {participants.length.toLocaleString("en-US")} total
-            </Badge>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table className="min-w-[640px] text-sm [&_td]:px-5 [&_td]:py-4">
-              <TableHeader className="bg-background/30 [&_tr]:border-border/40 [&_th]:h-12 [&_th]:px-5 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.18em] [&_th]:text-text-secondary">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Trader Name</TableHead>
-                  <TableHead className="text-right">Joined</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {participants.length > 0 ? (
-                  participants.map((roomParticipant) => {
-                    const username = roomParticipant.users?.username ?? "Anonymous"
-                    const avatarUrl = roomParticipant.users?.image_url
-
-                    return (
-                      <TableRow key={roomParticipant.id} className="border-border/35 hover:bg-surface-elevated/35">
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-accent-neon/20 bg-gradient-to-br from-accent-blue/40 via-surface-elevated to-accent-neon/20 ring-1 ring-white/5">
-                              {avatarUrl ? (
-                                <Image
-                                  src={avatarUrl}
-                                  alt={`${username} avatar`}
-                                  fill
-                                  className="object-cover"
-                                  sizes="44px"
-                                  unoptimized
-                                />
-                              ) : (
-                                <span className="flex size-full items-center justify-center text-xs font-semibold text-text-primary">
-                                  {getInitials(username)}
-                                </span>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-text-primary">{username}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right text-text-secondary tabular-nums">
-                          <span className="inline-flex items-center justify-end gap-2">
-                            <CalendarDays className="size-3.5 text-accent-neon/80" aria-hidden />
-                            {formatCompetitionDateTime(roomParticipant.created_at)}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                ) : (
-                  <TableRow className="border-border/35 hover:bg-transparent">
-                    <TableCell colSpan={2} className="h-32 text-center text-text-secondary">
-                      No traders have joined this room yet.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <PnlLeaderboardSection
+          leaderboardPage={leaderboardPage}
+          participantCount={rankedParticipants.length}
+          getPageHref={(page) => `/room/${room.id}?page=${page}`}
+        />
       </div>
     </main>
   )
