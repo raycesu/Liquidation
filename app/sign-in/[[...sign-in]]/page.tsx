@@ -1,22 +1,10 @@
-import { SignIn } from "@clerk/nextjs"
-import {
-  CLERK_SIGN_IN_PATH,
-  CLERK_SIGN_UP_PATH,
-} from "@/lib/clerk-routes"
+import { AuthPageShell } from "@/components/auth/auth-page-shell"
+import { SignInForm } from "@/components/auth/sign-in-form"
 
 export default function SignInPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4">
-      <SignIn
-        routing="path"
-        path={CLERK_SIGN_IN_PATH}
-        signUpUrl={CLERK_SIGN_UP_PATH}
-        appearance={{
-          elements: {
-            cardBox: "border border-border bg-surface shadow-2xl shadow-accent-blue/10",
-          },
-        }}
-      />
-    </main>
+    <AuthPageShell>
+      <SignInForm />
+    </AuthPageShell>
   )
 }
