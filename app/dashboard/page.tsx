@@ -1,13 +1,9 @@
-import Link from "next/link"
 import { redirect } from "next/navigation"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
 import { CreateRoomDialog } from "@/components/create-room-dialog"
+import { DashboardHeader } from "@/components/dashboard-header"
 import { JoinRoomDialog } from "@/components/join-room-dialog"
 import { RoomCard } from "@/components/room-card"
-import { SignOutButton } from "@/components/sign-out-button"
 import { requireCurrentUser } from "@/lib/auth"
-import { BRAND_LOGO_HEIGHT, BRAND_LOGO_SRC, BRAND_LOGO_WIDTH, BRAND_NAME } from "@/lib/brand"
 import { getSql } from "@/lib/db"
 import type { Room } from "@/lib/types"
 
@@ -15,8 +11,6 @@ export const dynamic = "force-dynamic"
 
 type DashboardParticipant = {
   id: string
-  available_margin: number
-  total_equity: number
   rooms: Room | null
 }
 
@@ -31,8 +25,6 @@ export default async function DashboardPage() {
   const participants = (await sql`
     select
       rp.id::text,
-      rp.available_margin::float8 as available_margin,
-      rp.total_equity::float8 as total_equity,
       json_build_object(
         'id', r.id::text,
         'creator_id', r.creator_id,
@@ -54,59 +46,32 @@ export default async function DashboardPage() {
   const rooms = participants.filter((participant) => participant.rooms)
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2">
-            <Image
-              src={BRAND_LOGO_SRC}
-              alt={`${BRAND_NAME} logo`}
-              width={BRAND_LOGO_WIDTH}
-              height={BRAND_LOGO_HEIGHT}
-              className="h-auto w-full max-w-md sm:max-w-lg md:max-w-xl"
-              priority
-              unoptimized
-            />
-            <h1 className="mt-2 text-4xl font-semibold text-text-primary">Competition rooms</h1>
-            <p className="mt-2 max-w-2xl text-text-secondary">
-              Create crypto perpetuals rooms, invite competitors, and trade with virtual capital using live prices.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild variant="secondary">
-              <Link href="/dashboard/profile">Profile</Link>
-            </Button>
-            <JoinRoomDialog />
-            <CreateRoomDialog />
-            <SignOutButton />
-          </div>
-        </header>
+    <main className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-10">
+        <DashboardHeader username={user.username} imageUrl={user.image_url} />
 
-        {rooms.length > 0 ? (
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {rooms.map((participant) =>
-              participant.rooms ? (
-                <RoomCard
-                  key={participant.id}
-                  room={participant.rooms}
-                  availableMargin={participant.available_margin}
-                  totalEquity={participant.total_equity}
-                />
-              ) : null,
-            )}
-          </section>
-        ) : (
-          <section className="rounded-xl border border-dashed border-border bg-surface p-10 text-center">
-            <h2 className="text-2xl font-semibold text-text-primary">No rooms yet</h2>
-            <p className="mx-auto mt-2 max-w-xl text-text-secondary">
-              Start a competition room or enter a shared room code to begin paper trading.
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <JoinRoomDialog />
-              <CreateRoomDialog />
+        <section className="space-y-6">
+          <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Competition Rooms</h1>
+
+          {rooms.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {rooms.map((participant) =>
+                participant.rooms ? <RoomCard key={participant.id} room={participant.rooms} /> : null,
+              )}
             </div>
-          </section>
-        )}
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border/80 bg-card/40 p-10 text-center shadow-inner shadow-black/5 backdrop-blur-sm sm:p-14">
+              <h2 className="text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">No rooms yet</h2>
+              <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+                Start a competition room or enter a shared room code to begin paper trading.
+              </p>
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <JoinRoomDialog />
+                <CreateRoomDialog />
+              </div>
+            </div>
+          )}
+        </section>
       </div>
     </main>
   )
