@@ -1,5 +1,6 @@
 import { joinRoom } from "@/actions/rooms"
 import { requireOnboardedUser } from "@/lib/auth"
+import { COMPETITION_ENDED_MESSAGE } from "@/lib/competition-guards"
 import { getSql } from "@/lib/db"
 
 jest.mock("@/lib/auth", () => ({
@@ -68,6 +69,38 @@ describe("joinRoom", () => {
     expect(result).toEqual({ ok: true, data: { roomId: "room_1" } })
     expect(sqlMock.mock.calls[0]?.[1]).toBe("ABC123")
     expect(sqlMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("rejects join when the competition has ended", async () => {
+    requireOnboardedUserMock.mockResolvedValue({
+      id: "user_1",
+      email: "trader@example.com",
+      username: "rayce",
+      image_url: null,
+      profile_setup_completed_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    })
+
+    const sqlMock = jest.fn().mockResolvedValueOnce([
+      {
+        id: "room_1",
+        creator_id: "creator_1",
+        name: "Arena",
+        description: null,
+        join_code: "ABC123",
+        starting_balance: 10000,
+        start_date: "2020-01-01T00:00:00.000Z",
+        end_date: "2020-12-31T23:59:59.000Z",
+        is_active: false,
+        created_at: "2020-01-01T00:00:00.000Z",
+      },
+    ])
+    getSqlMock.mockReturnValue(sqlMock as unknown as ReturnType<typeof getSql>)
+
+    const result = await joinRoom("ABC123")
+
+    expect(result).toEqual({ ok: false, error: COMPETITION_ENDED_MESSAGE })
+    expect(sqlMock).toHaveBeenCalledTimes(1)
   })
 
   it("returns an error when the code does not match a room", async () => {

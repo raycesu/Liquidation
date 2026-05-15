@@ -3,7 +3,8 @@ import { z } from "zod"
 import { isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrices } from "@/lib/pricing"
 import { getSql } from "@/lib/db"
-import { calculateLiquidationPrice, calculatePnl, floorRealizedPnl } from "@/lib/perpetuals"
+import { calculateLiquidationPrice } from "@/lib/perpetuals"
+import { computeManualCloseEconomics } from "@/lib/trading-engine/close-position"
 import {
   getLimitFillPrice,
   getTriggerPriority,
@@ -385,15 +386,14 @@ export const runOrderEngineForRoom = async (
     }
 
     const availableMargin = participantMargins.get(order.participant_id) ?? 0
-    const rawPnl = calculatePnl({
+    const { realizedPnl, nextAvailableMargin, tradeDirection } = computeManualCloseEconomics({
       entryPrice: attachedPosition.entry_price,
       livePrice: positionPrice,
       side: attachedPosition.side,
       size: attachedPosition.size,
+      marginAllocated: attachedPosition.margin_allocated,
+      availableMargin,
     })
-    const realizedPnl = floorRealizedPnl(rawPnl, attachedPosition.margin_allocated)
-    const nextAvailableMargin = Math.max(0, availableMargin + attachedPosition.margin_allocated + realizedPnl)
-    const tradeDirection = attachedPosition.side === "LONG" ? "CLOSE_LONG" : "CLOSE_SHORT"
 
     const triggerRows = (await sql`
       with claimed_order as (
@@ -491,7 +491,6 @@ export const runOrderEngineForRoom = async (
   if (revalidate && (filledOrderIds.length > 0 || closedPositionIds.length > 0 || cancelledOrderIds.length > 0)) {
     revalidatePath(`/room/${roomId}/trade`)
     revalidatePath(`/room/${roomId}`)
-    revalidatePath(`/room/${roomId}/leaderboard`)
   }
 
   return {

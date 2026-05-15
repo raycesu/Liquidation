@@ -17,8 +17,7 @@ Signed-out visitors see a **marketing landing page** at `/`. Signed-in users wit
 - **Dashboard** — Room cards with available margin, equity, competition status, and quick actions to create or join a room.
 - **Rooms** — Create competitions with name, optional **description**, schedule, starting balance, and active state. Each room gets a unique **six-character join code** (e.g. `A1B2C3`) shown in the lobby.
 - **Join flow** — Enter a join code from the dashboard **Join room** dialog; the lobby displays the code for participants to share. Legacy `/join/[room_id]` redirects to the dashboard.
-- **Room lobby** — Competition metadata, join code, description, status (upcoming / active / ended), and an embedded **PnL leaderboard** preview with a link to the full leaderboard page.
-- **Leaderboard** — Dedicated `/room/[room_id]/leaderboard` page with paginated rankings by equity and performance.
+- **Room lobby** — Competition metadata, join code, description, status (upcoming / active / ended), and a paginated **PnL leaderboard** (rank, trader, PnL, win rate, trades, free margin).
 
 ### Trading terminal
 
@@ -183,8 +182,7 @@ Commit the updated generated file when you intentionally change the tradable uni
 | `app/sign-in`, `app/sign-up` | Custom auth UI and SSO callbacks |
 | `app/dashboard` | Room list, join/create dialogs |
 | `app/dashboard/profile` | Profile tabs: stats, history, share |
-| `app/room/[room_id]` | Lobby, join code, leaderboard preview |
-| `app/room/[room_id]/leaderboard` | Full paginated leaderboard |
+| `app/room/[room_id]` | Lobby, join code, paginated PnL leaderboard |
 | `app/room/[room_id]/trade` | Trading terminal |
 | `app/join/[room_id]` | Legacy redirect to dashboard |
 | `app/user-profile/[[...user-profile]]` | Account settings and `/photo` route |
@@ -196,7 +194,7 @@ Commit the updated generated file when you intentionally change the tradable uni
 | `components/marketing/*` | Landing page shell |
 | `components/auth/*` | Sign-in, sign-up, OAuth |
 | `components/profile/*` | Profile page tabs and trading-style visuals |
-| `components/room/pnl-leaderboard-section.tsx` | Shared lobby/full leaderboard UI |
+| `components/room/pnl-leaderboard-section.tsx` | Room lobby PnL leaderboard table and pagination |
 | `lib/auth.ts` | `requireCurrentUser`, `requireOnboardedUser`, profile setup gate |
 | `lib/markets.ts` / `lib/markets.generated.ts` | Tradable markets and metadata |
 | `lib/perpetuals.ts` | Margin, liquidation price, sizing helpers |

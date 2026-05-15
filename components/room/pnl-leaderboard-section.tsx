@@ -1,6 +1,5 @@
 import Image from "next/image"
 import Link from "next/link"
-import type { ReactNode } from "react"
 import { ChevronLeft, ChevronRight, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,7 +12,6 @@ type PnlLeaderboardSectionProps = {
   leaderboardPage: LeaderboardPageData
   participantCount: number
   getPageHref: (page: number) => string
-  actions?: ReactNode
 }
 
 const getInitials = (username: string) =>
@@ -40,7 +38,6 @@ export const PnlLeaderboardSection = ({
   leaderboardPage,
   participantCount,
   getPageHref,
-  actions,
 }: PnlLeaderboardSectionProps) => {
   const { currentPage, totalPages, pageStartIndex, visibleParticipants, pageItems } = leaderboardPage
 
@@ -61,7 +58,6 @@ export const PnlLeaderboardSection = ({
             <Users className="size-3.5" aria-hidden />
             {participantCount.toLocaleString("en-US")} participants
           </Badge>
-          {actions}
         </div>
       </header>
 

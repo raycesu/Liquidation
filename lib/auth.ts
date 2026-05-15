@@ -58,20 +58,3 @@ export const ensureUserProfile = async ({ id, username, email, imageUrl }: Ensur
 
   return users[0] ?? null
 }
-
-export const getCurrentUserProfile = async () => {
-  const clerkUser = await currentUser()
-  if (!clerkUser) {
-    return null
-  }
-
-  const sql = getSql()
-  const users = (await sql`
-    select id, email, username, image_url, profile_setup_completed_at::text, created_at::text
-    from users
-    where id = ${clerkUser.id}
-    limit 1
-  `) as UserProfile[]
-
-  return users[0] ?? null
-}

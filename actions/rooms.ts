@@ -7,6 +7,7 @@ import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomJoinable } from "@/lib/competition-guards"
 import { getSql, withUserContext } from "@/lib/db"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { isUniqueViolation } from "@/lib/username"
 import type { ActionResult, Room } from "@/lib/types"
 
 const MAX_ROOM_DESCRIPTION_WORDS = 25
@@ -56,12 +57,6 @@ const generateJoinCode = () =>
     const index = Math.floor(Math.random() * ROOM_CODE_ALPHABET.length)
     return ROOM_CODE_ALPHABET.charAt(index)
   }).join("")
-
-const isUniqueViolation = (error: unknown) =>
-  typeof error === "object" &&
-  error !== null &&
-  "code" in error &&
-  (error as { code?: unknown }).code === "23505"
 
 export const createRoom = async (
   _previousState: ActionResult<CreateRoomData>,

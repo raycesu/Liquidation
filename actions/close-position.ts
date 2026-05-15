@@ -6,7 +6,7 @@ import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
 import { fetchMarketPrice } from "@/lib/pricing"
 import { getSql, withUserContext } from "@/lib/db"
-import { calculatePnl, floorRealizedPnl } from "@/lib/perpetuals"
+import { computeManualCloseEconomics } from "@/lib/trading-engine/close-position"
 import type { ActionResult, Position, RoomParticipant, Trade } from "@/lib/types"
 
 type PositionWithParticipant = Position & {
@@ -103,17 +103,14 @@ export const closePosition = async ({
   } catch {
     return { ok: false, error: "Unable to fetch market price. Try again in a moment." }
   }
-  const rawPnl = calculatePnl({
+  const { realizedPnl, nextAvailableMargin, tradeDirection } = computeManualCloseEconomics({
     entryPrice: position.entry_price,
     livePrice: finalPrice,
     side: position.side,
     size: position.size,
+    marginAllocated: position.margin_allocated,
+    availableMargin: position.room_participants.available_margin,
   })
-  const realizedPnl = floorRealizedPnl(rawPnl, position.margin_allocated)
-  const nextAvailableMargin = Math.max(
-    0,
-    position.room_participants.available_margin + position.margin_allocated + realizedPnl,
-  )
   const closedRows = (await sql`
     update positions
     set is_open = false,
@@ -141,7 +138,6 @@ export const closePosition = async ({
       and status = 'PENDING'
   `
 
-  const tradeDirection = position.side === "LONG" ? "CLOSE_LONG" : "CLOSE_SHORT"
   const tradeRows = (await sql`
     insert into trades (
       participant_id,

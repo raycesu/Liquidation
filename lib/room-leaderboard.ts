@@ -78,6 +78,36 @@ export const paginateRankedParticipants = (
   }
 }
 
+export const loadRoomParticipantsWithUsers = async (roomId: string) => {
+  const sql = getSql()
+
+  return (await sql`
+    select
+      rp.id::text,
+      rp.room_id::text,
+      rp.user_id,
+      rp.available_margin::float8 as available_margin,
+      rp.created_at::text,
+      json_build_object(
+        'id', u.id,
+        'username', u.username,
+        'image_url', u.image_url
+      ) as users
+    from room_participants rp
+    join users u on u.id = rp.user_id
+    where rp.room_id = ${roomId}
+    order by rp.created_at asc
+  `) as ParticipantWithUser[]
+}
+
+export const getRoomLeaderboard = async (roomId: string, page?: string | string[]) => {
+  const participants = await loadRoomParticipantsWithUsers(roomId)
+  const rankedParticipants = await getRankedParticipants(roomId, participants)
+  const leaderboardPage = paginateRankedParticipants(rankedParticipants, parseLeaderboardPage(page))
+
+  return { rankedParticipants, leaderboardPage }
+}
+
 export const getRankedParticipants = async (roomId: string, participants: ParticipantWithUser[]) => {
   const sql = getSql()
   const [tradeStatsRows, roomPositions] = (await Promise.all([

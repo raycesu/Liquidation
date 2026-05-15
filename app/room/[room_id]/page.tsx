@@ -9,8 +9,8 @@ import { PnlLeaderboardSection } from "@/components/room/pnl-leaderboard-section
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { formatWholeUsd } from "@/lib/format"
-import { getRankedParticipants, paginateRankedParticipants, parseLeaderboardPage } from "@/lib/room-leaderboard"
-import type { ParticipantWithUser, Room, RoomParticipant } from "@/lib/types"
+import { getRoomLeaderboard } from "@/lib/room-leaderboard"
+import type { Room, RoomParticipant } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
@@ -155,30 +155,12 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
     redirect("/dashboard")
   }
 
-  const participants = (await sql`
-    select
-      rp.id::text,
-      rp.room_id::text,
-      rp.user_id,
-      rp.available_margin::float8 as available_margin,
-      rp.created_at::text,
-      json_build_object(
-        'id', u.id,
-        'username', u.username,
-        'image_url', u.image_url
-      ) as users
-    from room_participants rp
-    join users u on u.id = rp.user_id
-    where rp.room_id = ${room.id}
-    order by rp.created_at asc
-  `) as ParticipantWithUser[]
+  const { rankedParticipants, leaderboardPage } = await getRoomLeaderboard(room.id, search?.page)
 
   const status = getRoomStatus(room)
   const roomDescription = room.description?.trim()
   const startDate = formatCompetitionDateParts(room.start_date)
   const endDate = formatCompetitionDateParts(room.end_date)
-  const rankedParticipants = await getRankedParticipants(room.id, participants)
-  const leaderboardPage = paginateRankedParticipants(rankedParticipants, parseLeaderboardPage(search?.page))
   const details: RoomDetail[] = [
     {
       label: "Starting balance",
@@ -245,17 +227,6 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
                 <Link href="/dashboard">
                   <BarChart3 className="size-4" aria-hidden />
                   Dashboard
-                </Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="h-11 rounded-full border-border/70 bg-background/35 px-5 text-text-primary shadow-lg shadow-accent-blue/5 backdrop-blur transition-colors hover:border-accent-neon/45 hover:bg-surface-elevated hover:text-white dark:bg-background/35 dark:hover:bg-surface-elevated"
-              >
-                <Link href={`/room/${room.id}/leaderboard`}>
-                  <Trophy className="size-4" aria-hidden />
-                  Full leaderboard
                 </Link>
               </Button>
               <Button

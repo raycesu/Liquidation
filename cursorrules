@@ -91,7 +91,7 @@ ROE%:      (unrealizedPnl / marginAllocated) * 100
 3. Floor PnL at `-margin_allocated` — never allow negative equity from a race condition.
 4. Set `is_open = false` on position.
 5. `available_margin += margin_allocated + realized_pnl`
-6. Recalculate and update `total_equity`.
+6. Equity is derived at read time from margin, open positions, and marks (no cached column).
 
 ### Liquidation Check (Lazy Evaluation)
 On every leaderboard or room dashboard page load, call the liquidation sweep

@@ -1,6 +1,11 @@
 import { revalidatePath } from "next/cache"
 import { getSql } from "@/lib/db"
 import { fetchMarketPrices } from "@/lib/pricing"
+import {
+  computeLiquidationRealizedPnl,
+  getCloseTradeDirection,
+  isPositionUnderwater,
+} from "@/lib/trading-engine/close-position"
 import type { ActionResult, Position, SupportedSymbol } from "@/lib/types"
 import type { RunLiquidationEngineResult } from "@/lib/trading-engine/types"
 
@@ -10,14 +15,6 @@ type LiquidationPosition = Position & {
     room_id: string
     available_margin: number
   } | null
-}
-
-const isUnderwater = (position: Position, livePrice: number) => {
-  if (position.side === "LONG") {
-    return livePrice <= position.liquidation_price
-  }
-
-  return livePrice >= position.liquidation_price
 }
 
 const liquidatePositionBatch = async (
@@ -40,11 +37,12 @@ const liquidatePositionBatch = async (
       continue
     }
 
-    if (!isUnderwater(position, livePrice)) {
+    if (!isPositionUnderwater(position, livePrice)) {
       continue
     }
 
-    const tradeDirection = position.side === "LONG" ? "CLOSE_LONG" : "CLOSE_SHORT"
+    const tradeDirection = getCloseTradeDirection(position.side)
+    const realizedPnl = computeLiquidationRealizedPnl(position.margin_allocated)
 
     const closedRows = (await sql`
       with closed_position as (
@@ -83,7 +81,7 @@ const liquidatePositionBatch = async (
           ${livePrice},
           ${position.size},
           ${position.size},
-          ${-position.margin_allocated}
+          ${realizedPnl}
         where exists (select 1 from closed_position)
         returning id::text
       )
@@ -179,7 +177,6 @@ export const liquidateParticipantPositions = async (
   if (revalidate && result.liquidated > 0) {
     revalidatePath(`/room/${roomId}/trade`)
     revalidatePath(`/room/${roomId}`)
-    revalidatePath(`/room/${roomId}/leaderboard`)
   }
 
   return { ok: true, data: result }
@@ -203,7 +200,6 @@ export const runLiquidationEngineForRoom = async (
   if (revalidate && result.liquidated > 0) {
     revalidatePath(`/room/${roomId}/trade`)
     revalidatePath(`/room/${roomId}`)
-    revalidatePath(`/room/${roomId}/leaderboard`)
   }
 
   return { ok: true, data: result }
