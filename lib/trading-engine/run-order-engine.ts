@@ -442,8 +442,8 @@ export const runOrderEngineForRoom = async (
           realized_pnl
         )
         select
-          ${order.participant_id},
-          ${attachedPosition.id},
+          ${order.participant_id}::uuid,
+          ${attachedPosition.id}::uuid,
           ${order.symbol},
           ${tradeDirection},
           ${positionPrice},

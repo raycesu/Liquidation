@@ -74,8 +74,8 @@ const liquidatePositionBatch = async (
           realized_pnl
         )
         select
-          ${position.participant_id},
-          ${position.id},
+          ${position.participant_id}::uuid,
+          ${position.id}::uuid,
           ${position.symbol},
           ${tradeDirection},
           ${livePrice},
