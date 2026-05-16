@@ -78,8 +78,6 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
           <TableHead>Type</TableHead>
           <TableHead>Coin</TableHead>
           <TableHead>Direction</TableHead>
-          <TableHead>Size</TableHead>
-          <TableHead>Original Size</TableHead>
           <TableHead>Order Value</TableHead>
           <TableHead>Price</TableHead>
           <TableHead>Trigger Conditions</TableHead>
@@ -103,11 +101,6 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
                   {order.symbol.replace("USDT", "")}
                 </TableCell>
                 <TableCell className={sideClassName}>{order.side === "LONG" ? "Long" : "Short"}</TableCell>
-                <TableCell className="font-mono">{formatUsd(order.size)}</TableCell>
-                <TableCell className="font-mono">
-                  {/* Orders are fully filled/cancelled today, so original size mirrors current size. */}
-                  {formatUsd(order.size)}
-                </TableCell>
                 <TableCell className="font-mono">{formatUsd(order.size)}</TableCell>
                 <TableCell className="font-mono">{formatNumber(order.trigger_price)}</TableCell>
                 <TableCell className="text-xs text-text-secondary">{getTriggerConditionLabel(order)}</TableCell>
@@ -135,7 +128,7 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
           })
         ) : (
           <TableRow className="border-border/40 hover:bg-transparent">
-            <TableCell colSpan={11} className="h-24 text-center text-text-secondary">
+            <TableCell colSpan={9} className="h-24 text-center text-text-secondary">
               No open orders
             </TableCell>
           </TableRow>
