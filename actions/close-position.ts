@@ -100,7 +100,11 @@ export const closePosition = async ({
 
   try {
     finalPrice = await fetchMarketPrice(position.symbol)
-  } catch {
+  } catch (error) {
+    console.error("[closePosition] fetchMarketPrice failed", {
+      symbol: position.symbol,
+      message: error instanceof Error ? error.message : String(error),
+    })
     return { ok: false, error: "Unable to fetch market price. Try again in a moment." }
   }
   const { realizedPnl, nextAvailableMargin, tradeDirection } = computeManualCloseEconomics({

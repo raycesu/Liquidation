@@ -100,7 +100,11 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
 
   try {
     entryPrice = await fetchMarketPrice(symbol)
-  } catch {
+  } catch (error) {
+    console.error("[placeOrder] fetchMarketPrice failed", {
+      symbol,
+      message: error instanceof Error ? error.message : String(error),
+    })
     return { ok: false, error: "Unable to fetch market price. Try again in a moment." }
   }
   const liquidationPrice = calculateLiquidationPrice({
