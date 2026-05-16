@@ -90,6 +90,7 @@ export default async function TradePage({ params }: TradePageProps) {
     select
       id::text,
       participant_id::text,
+      parent_order_id::text,
       position_id::text,
       symbol,
       side,

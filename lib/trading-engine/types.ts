@@ -1,5 +1,10 @@
 import type { Position, Trade } from "@/lib/types"
 
+export type LinkedBracketTrigger = {
+  orderId: string
+  positionId: string
+}
+
 export type RunOrderEngineResult = {
   filledOrderIds: string[]
   cancelledOrderIds: string[]
@@ -8,6 +13,7 @@ export type RunOrderEngineResult = {
   trades: Trade[]
   skippedSymbols: string[]
   skippedOrderIds: string[]
+  linkedBracketTriggers: LinkedBracketTrigger[]
 }
 
 export type RunOrderEngineOptions = {

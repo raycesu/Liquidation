@@ -5,12 +5,14 @@ import {
   isLimitTriggered,
   isStopLossTriggered,
   isTakeProfitTriggered,
+  validateTriggerPrices,
 } from "@/lib/trading-rules"
 import type { PendingOrder } from "@/lib/types"
 
 const baseOrder: PendingOrder = {
   id: "00000000-0000-0000-0000-000000000001",
   participant_id: "00000000-0000-0000-0000-000000000002",
+  parent_order_id: null,
   position_id: null,
   symbol: "BTCUSDT",
   side: "LONG",
@@ -48,5 +50,25 @@ describe("trading-rules", () => {
   it("maps trigger side to opposite direction", () => {
     expect(getTriggerSide("LONG")).toBe("SHORT")
     expect(getTriggerSide("SHORT")).toBe("LONG")
+  })
+
+  it("validates trigger prices relative to entry", () => {
+    expect(
+      validateTriggerPrices({
+        side: "LONG",
+        referencePrice: 100,
+        takeProfitPrice: 110,
+        stopLossPrice: 90,
+      }),
+    ).toBeNull()
+
+    expect(
+      validateTriggerPrices({
+        side: "LONG",
+        referencePrice: 100,
+        takeProfitPrice: 95,
+        stopLossPrice: null,
+      }),
+    ).toBe("Take profit must be above entry for longs.")
   })
 })

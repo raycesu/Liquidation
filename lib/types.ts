@@ -55,6 +55,7 @@ export type OrderStatus = "PENDING" | "FILLED" | "CANCELLED"
 export type PendingOrder = {
   id: string
   participant_id: string
+  parent_order_id: string | null
   position_id: string | null
   symbol: SupportedSymbol
   side: PositionSide

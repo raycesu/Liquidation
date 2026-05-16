@@ -7,6 +7,8 @@ import { getSql, withUserContext } from "@/lib/db"
 import { releaseEnginePoll, tryAcquireEnginePoll } from "@/lib/engine-poll-throttle"
 import type { ActionResult, Position, Trade } from "@/lib/types"
 
+import type { LinkedBracketTrigger } from "@/lib/trading-engine/types"
+
 export type CheckPendingOrdersResult = {
   filledOrderIds: string[]
   cancelledOrderIds: string[]
@@ -16,6 +18,7 @@ export type CheckPendingOrdersResult = {
   availableMargin: number | null
   skippedSymbols: string[]
   skippedOrderIds: string[]
+  linkedBracketTriggers: LinkedBracketTrigger[]
 }
 
 export const checkPendingOrders = async ({
@@ -64,6 +67,7 @@ export const checkPendingOrders = async ({
           availableMargin: null,
           skippedSymbols: [],
           skippedOrderIds: [],
+          linkedBracketTriggers: [],
         },
       }
     }
@@ -96,6 +100,7 @@ export const checkPendingOrders = async ({
           availableMargin: marginRows[0]?.available_margin ?? null,
           skippedSymbols: engineResult.data.skippedSymbols,
           skippedOrderIds: engineResult.data.skippedOrderIds,
+          linkedBracketTriggers: engineResult.data.linkedBracketTriggers,
         },
       }
     } finally {

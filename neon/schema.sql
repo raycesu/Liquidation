@@ -49,6 +49,7 @@ create table if not exists public.positions (
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   participant_id uuid not null references public.room_participants(id) on delete cascade,
+  parent_order_id uuid references public.orders(id) on delete cascade,
   position_id uuid references public.positions(id) on delete cascade,
   symbol text not null check (char_length(symbol) >= 3 and char_length(symbol) <= 64),
   side text not null check (side in ('LONG', 'SHORT')),
@@ -84,6 +85,7 @@ create index if not exists room_participants_room_id_idx on public.room_particip
 create index if not exists positions_participant_id_idx on public.positions (participant_id);
 create index if not exists positions_open_idx on public.positions (is_open) where is_open = true;
 create index if not exists orders_participant_id_idx on public.orders (participant_id);
+create index if not exists orders_parent_order_id_idx on public.orders (parent_order_id);
 create index if not exists orders_position_id_idx on public.orders (position_id);
 create index if not exists orders_pending_idx on public.orders (status) where status = 'PENDING';
 create index if not exists trades_participant_id_idx on public.trades (participant_id);

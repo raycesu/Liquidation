@@ -148,6 +148,7 @@ export const setPositionTriggers = async (
       returning
         id::text,
         participant_id::text,
+        parent_order_id::text,
         position_id::text,
         symbol,
         side,
@@ -196,6 +197,7 @@ export const setPositionTriggers = async (
       returning
         id::text,
         participant_id::text,
+        parent_order_id::text,
         position_id::text,
         symbol,
         side,

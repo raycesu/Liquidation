@@ -13,6 +13,7 @@ type OrderWithParticipant = PendingOrder & {
 
 export type CancelOrderResult = {
   orderId: string
+  cancelledBracketOrderIds: string[]
   availableMargin: number
 }
 
@@ -58,6 +59,7 @@ export const cancelOrder = async ({
     select
       o.id::text,
       o.participant_id::text,
+      o.parent_order_id::text,
       o.position_id::text,
       o.symbol,
       o.side,
@@ -107,6 +109,21 @@ export const cancelOrder = async ({
     return { ok: false, error: "Order is no longer pending" }
   }
 
+  let cancelledBracketOrderIds: string[] = []
+
+  if (order.type === "LIMIT") {
+    const cancelledBracketRows = (await sql`
+      update orders
+      set status = 'CANCELLED',
+          cancelled_at = now()
+      where parent_order_id = ${order.id}
+        and status = 'PENDING'
+      returning id::text
+    `) as { id: string }[]
+
+    cancelledBracketOrderIds = cancelledBracketRows.map((row) => row.id)
+  }
+
   let nextAvailableMargin = order.room_participants.available_margin
 
   if (order.margin_reserved > 0) {
@@ -124,6 +141,7 @@ export const cancelOrder = async ({
     ok: true,
     data: {
       orderId: order.id,
+      cancelledBracketOrderIds,
       availableMargin: nextAvailableMargin,
     },
   }

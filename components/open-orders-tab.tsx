@@ -15,6 +15,11 @@ type OpenOrdersTabProps = {
   onOrderCancelled: (payload: CancelOrderResult) => void
 }
 
+type TriggerSummary = {
+  tpPrice: number | null
+  slPrice: number | null
+}
+
 const orderTypeLabel: Record<PendingOrder["type"], string> = {
   LIMIT: "Limit",
   TAKE_PROFIT: "Take Profit",
@@ -33,28 +38,40 @@ const getTriggerConditionLabel = (order: PendingOrder) => {
   return order.side === "LONG" ? "Mark >= SL trigger" : "Mark <= SL trigger"
 }
 
+const buildTriggerSummaryMap = (orders: PendingOrder[]) => {
+  return orders.reduce<Record<string, TriggerSummary>>((acc, order) => {
+    if (order.type !== "TAKE_PROFIT" && order.type !== "STOP_LOSS") {
+      return acc
+    }
+
+    const groupKey = order.position_id ?? order.parent_order_id
+
+    if (!groupKey) {
+      return acc
+    }
+
+    const current = acc[groupKey] ?? { tpPrice: null, slPrice: null }
+
+    if (order.type === "TAKE_PROFIT") {
+      current.tpPrice = order.trigger_price
+    }
+
+    if (order.type === "STOP_LOSS") {
+      current.slPrice = order.trigger_price
+    }
+
+    acc[groupKey] = current
+    return acc
+  }, {})
+}
+
 export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTabProps) => {
   const [isPending, startTransition] = useTransition()
-  const triggerByPositionId = useMemo(() => {
-    return orders.reduce<Record<string, { tpPrice: number | null; slPrice: number | null }>>((acc, order) => {
-      if (!order.position_id) {
-        return acc
-      }
-
-      const current = acc[order.position_id] ?? { tpPrice: null, slPrice: null }
-
-      if (order.type === "TAKE_PROFIT") {
-        current.tpPrice = order.trigger_price
-      }
-
-      if (order.type === "STOP_LOSS") {
-        current.slPrice = order.trigger_price
-      }
-
-      acc[order.position_id] = current
-      return acc
-    }, {})
-  }, [orders])
+  const triggerSummaryByGroupKey = useMemo(() => buildTriggerSummaryMap(orders), [orders])
+  const visibleOrders = useMemo(
+    () => orders.filter((order) => !order.parent_order_id),
+    [orders],
+  )
 
   const handleCancel = (orderId: string) => {
     startTransition(async () => {
@@ -86,10 +103,11 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
         </TableRow>
       </TableHeader>
       <TableBody>
-        {orders.length > 0 ? (
-          orders.map((order) => {
+        {visibleOrders.length > 0 ? (
+          visibleOrders.map((order) => {
             const sideClassName = order.side === "LONG" ? "text-profit" : "text-loss"
-            const groupedTriggers = order.position_id ? triggerByPositionId[order.position_id] : null
+            const triggerGroupKey = order.position_id ?? order.id
+            const groupedTriggers = triggerSummaryByGroupKey[triggerGroupKey] ?? null
 
             return (
               <TableRow key={order.id} className="border-border/40 hover:bg-surface-elevated/30">

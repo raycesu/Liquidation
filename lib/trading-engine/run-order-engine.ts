@@ -11,7 +11,9 @@ import {
   isLimitTriggered,
   isStopLossTriggered,
   isTakeProfitTriggered,
+  validateTriggerPrices,
 } from "@/lib/trading-rules"
+import type { LinkedBracketTrigger } from "@/lib/trading-engine/types"
 import type { ActionResult, PendingOrder, Position, PositionSide, SupportedSymbol, Trade } from "@/lib/types"
 import type { RunOrderEngineOptions, RunOrderEngineResult } from "@/lib/trading-engine/types"
 
@@ -67,6 +69,7 @@ export const runOrderEngineForRoom = async (
         select
           o.id::text,
           o.participant_id::text,
+          o.parent_order_id::text,
           o.position_id::text,
           o.symbol,
           o.side,
@@ -105,6 +108,7 @@ export const runOrderEngineForRoom = async (
         select
           o.id::text,
           o.participant_id::text,
+          o.parent_order_id::text,
           o.position_id::text,
           o.symbol,
           o.side,
@@ -150,6 +154,7 @@ export const runOrderEngineForRoom = async (
     trades: [],
     skippedSymbols: [],
     skippedOrderIds: [],
+    linkedBracketTriggers: [],
   }
 
   if (orders.length === 0) {
@@ -164,6 +169,7 @@ export const runOrderEngineForRoom = async (
   const newPositions: Position[] = []
   const closedPositionIds: string[] = []
   const trades: Trade[] = []
+  const linkedBracketTriggers: LinkedBracketTrigger[] = []
 
   if (unsupportedOrders.length > 0) {
     const unsupportedByParticipant = new Map<string, PendingOrderRow[]>()
@@ -210,6 +216,7 @@ export const runOrderEngineForRoom = async (
         trades,
         skippedSymbols: Array.from(skippedSymbols),
         skippedOrderIds,
+        linkedBracketTriggers,
       },
     }
   }
@@ -348,6 +355,65 @@ export const runOrderEngineForRoom = async (
       }
 
       filledOrderIds.push(order.id)
+
+      const bracketRows = (await sql`
+        select
+          id::text,
+          type,
+          trigger_price::float8 as trigger_price
+        from orders
+        where parent_order_id = ${order.id}
+          and status = 'PENDING'
+      `) as { id: string; type: PendingOrder["type"]; trigger_price: number }[]
+
+      for (const bracket of bracketRows) {
+        const validationError =
+          bracket.type === "TAKE_PROFIT"
+            ? validateTriggerPrices({
+                side: fillRow.position.side,
+                referencePrice: fillRow.position.entry_price,
+                takeProfitPrice: bracket.trigger_price,
+                stopLossPrice: null,
+              })
+            : validateTriggerPrices({
+                side: fillRow.position.side,
+                referencePrice: fillRow.position.entry_price,
+                takeProfitPrice: null,
+                stopLossPrice: bracket.trigger_price,
+              })
+
+        if (validationError) {
+          await sql`
+            update orders
+            set status = 'CANCELLED',
+                cancelled_at = now()
+            where id = ${bracket.id}
+              and status = 'PENDING'
+          `
+          cancelledOrderIds.push(bracket.id)
+          continue
+        }
+
+        const linkedRows = (await sql`
+          update orders
+          set position_id = ${fillRow.position.id}
+          where id = ${bracket.id}
+            and status = 'PENDING'
+          returning id::text
+        `) as { id: string }[]
+
+        if (linkedRows[0]) {
+          linkedBracketTriggers.push({
+            orderId: bracket.id,
+            positionId: fillRow.position.id,
+          })
+        }
+      }
+
+      continue
+    }
+
+    if (!order.position_id) {
       continue
     }
 
@@ -507,6 +573,7 @@ export const runOrderEngineForRoom = async (
       trades,
       skippedSymbols: Array.from(skippedSymbols),
       skippedOrderIds,
+      linkedBracketTriggers,
     },
   }
 }

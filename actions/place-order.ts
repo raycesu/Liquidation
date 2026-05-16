@@ -266,6 +266,7 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
       returning
         id::text,
         participant_id::text,
+        parent_order_id::text,
         position_id::text,
         symbol,
         side,
@@ -314,6 +315,7 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
       returning
         id::text,
         participant_id::text,
+        parent_order_id::text,
         position_id::text,
         symbol,
         side,

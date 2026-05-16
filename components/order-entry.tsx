@@ -34,7 +34,11 @@ type OrderEntryProps = {
     },
   ) => void
   onOrderRejected: (optimisticId: string) => void
-  onLimitOrderPlaced: (order: PendingOrder, availableMargin: number) => void
+  onLimitOrderPlaced: (
+    order: PendingOrder,
+    triggers: PendingOrder[],
+    availableMargin: number,
+  ) => void
 }
 
 type OrderType = "MARKET" | "LIMIT"
@@ -72,7 +76,7 @@ export const OrderEntry = ({
   const [side, setSide] = useState<PositionSide>("LONG")
   const maxLev = getMaxLeverage(symbol)
   const [leverage, setLeverage] = useState(() => Math.min(5, getMaxLeverage(symbol)))
-  const [sizeUsd, setSizeUsd] = useState("1000")
+  const [sizeUsd, setSizeUsd] = useState("0")
   const [sizeUnit, setSizeUnit] = useState<"USD" | "BASE">("USD")
   const [sizePercent, setSizePercent] = useState(0)
   const [tpSlEnabled, setTpSlEnabled] = useState(false)
@@ -273,6 +277,8 @@ export const OrderEntry = ({
           leverage,
           size: numericSize,
           limitPrice: numericLimitPrice,
+          takeProfitPrice: tpValue,
+          stopLossPrice: slValue,
         })
 
         if (!result.ok) {
@@ -281,7 +287,7 @@ export const OrderEntry = ({
           return
         }
 
-        onLimitOrderPlaced(result.data.order, result.data.availableMargin)
+        onLimitOrderPlaced(result.data.order, result.data.triggers, result.data.availableMargin)
         toast.success(`Limit ${side === "LONG" ? "buy" : "sell"} ${baseSymbol} placed`)
         setSizePercent(0)
         } finally {

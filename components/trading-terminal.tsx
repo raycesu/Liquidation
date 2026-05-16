@@ -108,8 +108,12 @@ export const TradingTerminal = ({
     })
   }
 
-  const handleLimitOrderPlaced = (order: PendingOrder, nextAvailableMargin: number) => {
-    setPendingOrders((current) => [order, ...current])
+  const handleLimitOrderPlaced = (
+    order: PendingOrder,
+    triggers: PendingOrder[],
+    nextAvailableMargin: number,
+  ) => {
+    setPendingOrders((current) => [...triggers, order, ...current])
     setAvailableMargin(nextAvailableMargin)
   }
 
@@ -141,11 +145,12 @@ export const TradingTerminal = ({
   }
 
   const handleOrderCancelled = (payload: CancelOrderResult) => {
+    const cancelledIds = new Set([payload.orderId, ...payload.cancelledBracketOrderIds])
+    const now = new Date().toISOString()
+
     setPendingOrders((current) =>
       current.map((order) =>
-        order.id === payload.orderId
-          ? { ...order, status: "CANCELLED", cancelled_at: new Date().toISOString() }
-          : order,
+        cancelledIds.has(order.id) ? { ...order, status: "CANCELLED", cancelled_at: now } : order,
       ),
     )
     setAvailableMargin(payload.availableMargin)
@@ -178,13 +183,26 @@ export const TradingTerminal = ({
       setPositions((current) => current.filter((position) => !closedSet.has(position.id)))
     }
 
-    if (result.filledOrderIds.length > 0 || result.cancelledOrderIds.length > 0) {
+    if (
+      result.filledOrderIds.length > 0 ||
+      result.cancelledOrderIds.length > 0 ||
+      result.linkedBracketTriggers.length > 0
+    ) {
       const filledSet = new Set(result.filledOrderIds)
       const cancelledSet = new Set(result.cancelledOrderIds)
+      const linkedByOrderId = new Map(
+        result.linkedBracketTriggers.map((link) => [link.orderId, link.positionId]),
+      )
       const now = new Date().toISOString()
 
       setPendingOrders((current) =>
         current.map((order) => {
+          const linkedPositionId = linkedByOrderId.get(order.id)
+
+          if (linkedPositionId) {
+            return { ...order, position_id: linkedPositionId }
+          }
+
           if (filledSet.has(order.id)) {
             return { ...order, status: "FILLED", filled_at: now }
           }
