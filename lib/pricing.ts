@@ -1,5 +1,6 @@
 import { fetchHlAllMids } from "@/lib/hyperliquid"
 import { getMarket, isSupportedSymbol } from "@/lib/markets"
+import type { Market } from "@/lib/markets-types"
 
 const PRICE_CACHE_TTL_MS = 1500
 
@@ -23,6 +24,30 @@ const parsePositive = (raw: string | undefined): number | null => {
 }
 
 const cacheKeyForSymbols = (symbols: string[]) => [...symbols].sort().join(",")
+
+/** Perps / major crypto mids (BTC, ETH, …) — use main `allMids`, not `dex: xyz`. */
+const fetchHyperliquidMainMid = async (hlPriceKey: string): Promise<number> => {
+  const mids = await fetchHlAllMids()
+  const mid = parsePositive(mids[hlPriceKey])
+
+  if (mid == null) {
+    throw new Error(`Unable to fetch Hyperliquid main-book mid for ${hlPriceKey}`)
+  }
+
+  return mid
+}
+
+const fetchHyperliquidMidForMarket = async (market: Market): Promise<number> => {
+  const mids = await fetchHlAllMids("xyz")
+  const key = market.hlPriceKey ?? market.symbol
+  const mid = parsePositive(mids[key])
+
+  if (mid == null) {
+    throw new Error(`Unable to fetch Hyperliquid mid for ${key}`)
+  }
+
+  return mid
+}
 
 export const fetchFuturesPrice = async (binanceSymbol: string): Promise<number> => {
   const response = await fetch(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${binanceSymbol}`, {
@@ -60,17 +85,14 @@ export const fetchMarketPrice = async (canonicalSymbol: string): Promise<number>
   let price: number
 
   if (market.priceSource === "binance-futures" && market.binanceSymbol) {
-    price = await fetchFuturesPrice(market.binanceSymbol)
-  } else {
-    const mids = await fetchHlAllMids("xyz")
-    const key = market.hlPriceKey ?? market.symbol
-    const mid = parsePositive(mids[key])
-
-    if (mid == null) {
-      throw new Error(`Unable to fetch Hyperliquid mid for ${key}`)
+    try {
+      price = await fetchFuturesPrice(market.binanceSymbol)
+    } catch {
+      const hlKey = market.hlPriceKey ?? market.symbol
+      price = await fetchHyperliquidMainMid(hlKey)
     }
-
-    price = mid
+  } else {
+    price = await fetchHyperliquidMidForMarket(market)
   }
 
   singlePriceCache.set(canonicalSymbol, { price, expiresAt: now + PRICE_CACHE_TTL_MS })
@@ -102,23 +124,60 @@ export const fetchMarketPrices = async (canonicalSymbols: string[]): Promise<Rec
   if (binanceCanon.length > 0) {
     const binanceSymbols = binanceCanon.map((s) => getMarket(s)!.binanceSymbol!)
     const encoded = encodeURIComponent(JSON.stringify(binanceSymbols))
-    const response = await fetch(`https://fapi.binance.com/fapi/v1/ticker/price?symbols=${encoded}`, {
-      cache: "no-store",
-    })
+    let hlMainMids: Record<string, string> | null = null
 
-    if (!response.ok) {
-      throw new Error("Unable to batch-fetch Binance futures prices")
+    const loadHlMainMids = async () => {
+      if (hlMainMids == null) {
+        hlMainMids = await fetchHlAllMids()
+      }
+      return hlMainMids
     }
 
-    const rows = (await response.json()) as { symbol: string; price: string }[]
-    const byBin = new Map(rows.map((r) => [r.symbol, r.price]))
+    try {
+      const response = await fetch(`https://fapi.binance.com/fapi/v1/ticker/price?symbols=${encoded}`, {
+        cache: "no-store",
+      })
 
-    for (const canon of binanceCanon) {
-      const m = getMarket(canon)!
-      const raw = byBin.get(m.binanceSymbol!)
-      const px = parsePositive(raw)
-      if (px != null) {
-        out[canon] = px
+      if (!response.ok) {
+        throw new Error("Unable to batch-fetch Binance futures prices")
+      }
+
+      const rows = (await response.json()) as { symbol: string; price: string }[]
+      const byBin = new Map(rows.map((r) => [r.symbol, r.price]))
+
+      for (const canon of binanceCanon) {
+        const m = getMarket(canon)!
+        const raw = byBin.get(m.binanceSymbol!)
+        const px = parsePositive(raw)
+        if (px != null) {
+          out[canon] = px
+        }
+      }
+    } catch {
+      const mids = await loadHlMainMids()
+
+      for (const canon of binanceCanon) {
+        const m = getMarket(canon)!
+        const key = m.hlPriceKey ?? m.symbol
+        const px = parsePositive(mids[key])
+        if (px != null) {
+          out[canon] = px
+        }
+      }
+    }
+
+    const missingBinance = binanceCanon.filter((c) => out[c] == null)
+
+    if (missingBinance.length > 0) {
+      const mids = await loadHlMainMids()
+
+      for (const canon of missingBinance) {
+        const m = getMarket(canon)!
+        const key = m.hlPriceKey ?? m.symbol
+        const px = parsePositive(mids[key])
+        if (px != null) {
+          out[canon] = px
+        }
       }
     }
   }
