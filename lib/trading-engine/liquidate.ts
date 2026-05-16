@@ -51,7 +51,7 @@ const liquidatePositionBatch = async (
             closed_at = now()
         where id = ${position.id}
           and is_open = true
-        returning id::text as position_id
+        returning id, participant_id, symbol, size
       ),
       cancelled_orders as (
         update orders
@@ -74,18 +74,18 @@ const liquidatePositionBatch = async (
           realized_pnl
         )
         select
-          ${position.participant_id}::uuid,
-          ${position.id}::uuid,
-          ${position.symbol},
+          cp.participant_id,
+          cp.id,
+          cp.symbol,
           ${tradeDirection},
           ${livePrice},
-          ${position.size},
-          ${position.size},
+          cp.size,
+          cp.size,
           ${realizedPnl}
-        where exists (select 1 from closed_position)
+        from closed_position cp
         returning id::text
       )
-      select position_id from closed_position
+      select id::text as position_id from closed_position
     `) as { position_id: string }[]
 
     if (!closedRows[0]) {

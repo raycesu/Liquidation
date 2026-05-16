@@ -280,8 +280,8 @@ export const runOrderEngineForRoom = async (
             true
           from claimed
           returning
-            id::text,
-            participant_id::text,
+            id,
+            participant_id,
             symbol,
             side,
             leverage,
@@ -411,7 +411,11 @@ export const runOrderEngineForRoom = async (
         where id = ${attachedPosition.id}
           and is_open = true
           and exists (select 1 from claimed_order)
-        returning id::text as position_id
+        returning
+          id,
+          participant_id,
+          symbol,
+          size
       ),
       updated_margin as (
         update room_participants
@@ -442,15 +446,15 @@ export const runOrderEngineForRoom = async (
           realized_pnl
         )
         select
-          ${order.participant_id}::uuid,
-          ${attachedPosition.id}::uuid,
-          ${order.symbol},
+          closed_position.participant_id,
+          closed_position.id,
+          closed_position.symbol,
           ${tradeDirection},
           ${positionPrice},
-          ${attachedPosition.size},
-          ${attachedPosition.size},
+          closed_position.size,
+          closed_position.size,
           ${realizedPnl}
-        where exists (select 1 from closed_position)
+        from closed_position
         returning
           id::text,
           participant_id::text,
@@ -465,7 +469,7 @@ export const runOrderEngineForRoom = async (
       )
       select
         claimed_order.order_id,
-        closed_position.position_id,
+        closed_position.id::text as position_id,
         row_to_json(inserted_trade)::jsonb as trade
       from claimed_order
       join closed_position on true
