@@ -17,7 +17,7 @@ export const MarketingNav = () => {
             alt=""
             width={BRAND_LOGO_WIDTH}
             height={BRAND_LOGO_HEIGHT}
-            className="h-8 w-auto sm:h-9"
+            className="h-10 w-auto sm:h-11"
             priority
             unoptimized
           />
@@ -35,8 +35,9 @@ export const MarketingNav = () => {
           </Button>
           <Button
             asChild
+            variant="outline"
             size="default"
-            className="h-10 rounded-full border border-[#b8ebff]/70 bg-[#ecf8ff] px-4 text-sm font-semibold text-[#03101f] shadow-[0_10px_24px_rgb(17_191_255/0.18),inset_0_1px_0_rgb(255_255_255/0.9)] hover:border-white hover:bg-white sm:px-5"
+            className="h-10 rounded-full !border-[#d8f3ff]/75 !bg-[#ecf8ff] px-4 text-sm font-semibold !text-[#03101f] shadow-[0_10px_24px_rgb(17_191_255/0.18),inset_0_1px_0_rgb(255_255_255/0.9)] hover:!border-white hover:!bg-white hover:!text-[#03101f] hover:shadow-[0_10px_24px_rgb(255_255_255/0.16),inset_0_1px_0_rgb(255_255_255/0.95)] sm:px-5"
           >
             <Link href="/sign-up">Get started</Link>
           </Button>
