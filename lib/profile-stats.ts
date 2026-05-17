@@ -1,7 +1,12 @@
 import { getSql } from "@/lib/db"
 import { computeParticipantEquity } from "@/lib/participant-equity"
+import {
+  buildUnrealizedPnlByParticipant,
+  computePnlPercentFromTotalPnl,
+  placementRankForParticipant,
+  scoreParticipantsByTotalPnl,
+} from "@/lib/participant-pnl"
 import { fetchMarketPrices } from "@/lib/pricing"
-import { calculatePnl } from "@/lib/perpetuals"
 import type {
   Position,
   PositionSide,
@@ -71,17 +76,16 @@ type LastTradeRow = {
   last_trade_at: string | null
 }
 
+type RealizedPnlRow = {
+  participant_id: string
+  realized_pnl: number
+}
+
 const EPS = 1e-6
 
 export { computeDisplayEquity, computeParticipantEquity } from "@/lib/participant-equity"
 
-export const computePnlPercent = (displayEquity: number, startingBalance: number) => {
-  if (startingBalance <= 0) {
-    return 0
-  }
-
-  return ((displayEquity - startingBalance) / startingBalance) * 100
-}
+export { computePnlPercentFromTotalPnl, placementRankForParticipant } from "@/lib/participant-pnl"
 
 export const closedTradeRoePercent = (realizedPnl: number, marginAllocated: number) => {
   if (marginAllocated <= EPS) {
@@ -135,60 +139,6 @@ const buildOpenMarginByParticipant = (openRows: OpenPositionRow[]) => {
   return marginByParticipant
 }
 
-const buildUnrealizedByParticipant = (
-  openRows: OpenPositionRow[],
-  prices: Partial<Record<SupportedSymbol, number>>,
-) => {
-  const pnlByParticipant = new Map<string, number>()
-
-  openRows.forEach((position) => {
-    const livePrice = prices[position.symbol]
-
-    if (!livePrice) {
-      return
-    }
-
-    const pnl = calculatePnl({
-      entryPrice: position.entry_price,
-      livePrice,
-      side: position.side,
-      size: position.size,
-    })
-    pnlByParticipant.set(position.participant_id, (pnlByParticipant.get(position.participant_id) ?? 0) + pnl)
-  })
-
-  return pnlByParticipant
-}
-
-const rankParticipantsInRoom = (
-  roomId: string,
-  participants: PlainParticipantRow[],
-  openMarginByParticipant: Map<string, number>,
-  unrealizedByParticipant: Map<string, number>,
-) => {
-  const inRoom = participants.filter((p) => p.room_id === roomId)
-  const scored = inRoom.map((p) => ({
-    id: p.id,
-    displayEquity: computeParticipantEquity(
-      p.available_margin,
-      openMarginByParticipant.get(p.id) ?? 0,
-      unrealizedByParticipant.get(p.id) ?? 0,
-    ),
-  }))
-  scored.sort((a, b) => b.displayEquity - a.displayEquity)
-  return scored
-}
-
-export const placementRankForParticipant = (sortedDisplay: { id: string }[], participantId: string) => {
-  const index = sortedDisplay.findIndex((row) => row.id === participantId)
-
-  if (index < 0) {
-    return 0
-  }
-
-  return index + 1
-}
-
 export const loadProfileDashboardData = async (userId: string): Promise<ProfileDashboardData> => {
   const sql = getSql()
 
@@ -238,7 +188,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     }
   }
 
-  const [allRoomParticipants, openPositions, entryRows, stylePositions, symbolRows, roeRows, lastTradeRows] =
+  const [allRoomParticipants, openPositions, realizedPnlRows, entryRows, stylePositions, symbolRows, roeRows, lastTradeRows] =
     (await Promise.all([
       sql`
         select
@@ -278,6 +228,22 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
             where mine.user_id = ${userId}
               and mine.room_id = rp.room_id
           )
+      `,
+      sql`
+        select
+          t.participant_id::text,
+          coalesce(sum(t.realized_pnl), 0)::float8 as realized_pnl
+        from trades t
+        join room_participants rp on rp.id = t.participant_id
+        where exists (
+          select 1
+          from room_participants mine
+          where mine.user_id = ${userId}
+            and mine.room_id = rp.room_id
+        )
+          and t.direction in ('CLOSE_LONG', 'CLOSE_SHORT')
+          and t.realized_pnl is not null
+        group by t.participant_id
       `,
       sql`
         select
@@ -346,6 +312,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     ])) as unknown as [
       PlainParticipantRow[],
       OpenPositionRow[],
+      RealizedPnlRow[],
       EntryCountRow[],
       PositionStyleRow[],
       SymbolCountRow[],
@@ -366,7 +333,12 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
   }
 
   const openMarginByParticipant = buildOpenMarginByParticipant(openPositions)
-  const unrealizedByParticipant = buildUnrealizedByParticipant(openPositions, prices)
+  const unrealizedByParticipant = buildUnrealizedPnlByParticipant(openPositions, prices)
+
+  const realizedByParticipant = new Map<string, number>()
+  realizedPnlRows.forEach((row) => {
+    realizedByParticipant.set(row.participant_id, row.realized_pnl)
+  })
 
   const openByParticipant = new Map<string, boolean>()
   openPositions.forEach((p) => {
@@ -401,19 +373,19 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
       continue
     }
 
-    const ranked = rankParticipantsInRoom(
-      room.id,
-      allRoomParticipants,
-      openMarginByParticipant,
-      unrealizedByParticipant,
-    )
-    const rankedDisplay = ranked.map((r) => ({ id: r.id, displayEquity: r.displayEquity }))
-    const placementRank = placementRankForParticipant(rankedDisplay, row.id)
-    const mine = ranked.find((r) => r.id === row.id)
-    const displayEquity = mine?.displayEquity ?? row.available_margin
-    const pnlPercent = computePnlPercent(displayEquity, room.starting_balance)
+    const inRoom = allRoomParticipants.filter((participant) => participant.room_id === room.id)
+    const ranked = scoreParticipantsByTotalPnl(inRoom, realizedByParticipant, unrealizedByParticipant)
+    const placementRank = placementRankForParticipant(ranked, row.id)
+    const mine = ranked.find((participant) => participant.id === row.id)
+    const totalPnl = mine?.totalPnl ?? 0
+    const pnlPercent = computePnlPercentFromTotalPnl(totalPnl, room.starting_balance)
     pnlPercents.push(pnlPercent)
 
+    const displayEquity = computeParticipantEquity(
+      row.available_margin,
+      openMarginByParticipant.get(row.id) ?? 0,
+      unrealizedByParticipant.get(row.id) ?? 0,
+    )
     const hasOpen = openByParticipant.has(row.id)
 
     if (isAccountBusted(displayEquity, hasOpen)) {
@@ -428,11 +400,10 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
       room,
       participantId: row.id,
       placementRank,
-      entryCount: entryByParticipant.get(row.id) ?? 0,
+      participantCount: participantCountByRoom.get(room.id) ?? 0,
       endDateIso: room.end_date,
       isOngoing: roomIsOngoing(room),
       pnlPercent,
-      displayEquity,
     })
   }
 
@@ -456,7 +427,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
 
   const tradingStyle = buildTradingStyle(stylePositions, symbolRows)
 
-  const shareRoomOptions = buildShareRoomOptions(competitionRows, roeRows, participantCountByRoom)
+  const shareRoomOptions = buildShareRoomOptions(competitionRows, roeRows, participantCountByRoom, entryByParticipant)
 
   return {
     competitionRows,
@@ -538,6 +509,7 @@ const buildShareRoomOptions = (
   competitionRows: ProfileCompetitionRow[],
   roeRows: ClosedTradeRoeRow[],
   participantCountByRoom: Map<string, number>,
+  entryByParticipant: Map<string, number>,
 ): ProfileShareRoomOption[] =>
   competitionRows.map((comp) => {
     const roomTrades = roeRows.filter((r) => r.room_id === comp.room.id)
@@ -547,8 +519,8 @@ const buildShareRoomOptions = (
       participantId: comp.participantId,
       placementRank: comp.placementRank,
       pnlPercent: comp.pnlPercent,
-      entryCount: comp.entryCount,
-      participantCount: participantCountByRoom.get(comp.room.id) ?? 0,
+      entryCount: entryByParticipant.get(comp.participantId) ?? 0,
+      participantCount: participantCountByRoom.get(comp.room.id) ?? comp.participantCount,
       startDateIso: comp.room.start_date,
       endDateIso: comp.endDateIso,
       isOngoing: comp.isOngoing,

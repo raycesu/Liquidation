@@ -41,11 +41,10 @@ const mockData: Pick<
       },
       participantId: "b8c148dd-c7c3-40ab-ba26-d26b27e84acb",
       placementRank: 1,
-      entryCount: 1,
+      participantCount: 1,
       endDateIso: "2026-04-26 04:00:00+00",
       isOngoing: false,
       pnlPercent: -0.003,
-      displayEquity: 9999.66,
     },
   ],
   shareRoomOptions: [

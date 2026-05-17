@@ -1,12 +1,11 @@
 import {
   closedTradeRoePercent,
   computeDisplayEquity,
-  computePnlPercent,
+  computePnlPercentFromTotalPnl,
   isAccountBusted,
   maxOrNull,
   meanOrNull,
   pickTopTradesByPnl,
-  placementRankForParticipant,
 } from "@/lib/profile-stats"
 
 describe("computeDisplayEquity", () => {
@@ -20,14 +19,14 @@ describe("computeDisplayEquity", () => {
   })
 })
 
-describe("computePnlPercent", () => {
-  it("returns percent vs starting balance", () => {
-    expect(computePnlPercent(12_850, 10_000)).toBeCloseTo(28.5, 5)
+describe("computePnlPercentFromTotalPnl", () => {
+  it("returns percent of starting balance from trade PnL", () => {
+    expect(computePnlPercentFromTotalPnl(2850, 10_000)).toBeCloseTo(28.5, 5)
   })
 
   it("returns 0 when starting balance is not positive", () => {
-    expect(computePnlPercent(5000, 0)).toBe(0)
-    expect(computePnlPercent(5000, -100)).toBe(0)
+    expect(computePnlPercentFromTotalPnl(5000, 0)).toBe(0)
+    expect(computePnlPercentFromTotalPnl(5000, -100)).toBe(0)
   })
 })
 
@@ -115,14 +114,3 @@ describe("pickTopTradesByPnl", () => {
   })
 })
 
-describe("placementRankForParticipant", () => {
-  it("returns 0 when participant missing", () => {
-    expect(placementRankForParticipant([{ id: "a" }, { id: "b" }], "x")).toBe(0)
-  })
-
-  it("returns 1-based index in sorted list", () => {
-    const sorted = [{ id: "a" }, { id: "b" }, { id: "c" }]
-    expect(placementRankForParticipant(sorted, "a")).toBe(1)
-    expect(placementRankForParticipant(sorted, "c")).toBe(3)
-  })
-})

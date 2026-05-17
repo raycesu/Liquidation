@@ -119,11 +119,10 @@ export type ProfileCompetitionRow = {
   room: Room
   participantId: string
   placementRank: number
-  entryCount: number
+  participantCount: number
   endDateIso: string
   isOngoing: boolean
   pnlPercent: number
-  displayEquity: number
 }
 
 export type ProfileWipeoutEvent = {

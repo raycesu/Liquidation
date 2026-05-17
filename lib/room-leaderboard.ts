@@ -1,5 +1,5 @@
 import { getSql } from "@/lib/db"
-import { calculatePnl } from "@/lib/perpetuals"
+import { buildUnrealizedPnlByParticipant, scoreParticipantsByTotalPnl } from "@/lib/participant-pnl"
 import { fetchMarketPrices } from "@/lib/pricing"
 import type { ParticipantWithUser, Position } from "@/lib/types"
 
@@ -140,43 +140,30 @@ export const getRankedParticipants = async (roomId: string, participants: Partic
 
   const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol)))
   const prices = symbols.length > 0 ? await fetchMarketPrices(symbols) : {}
-  const pnlByParticipant = new Map<string, number>()
+  const unrealizedByParticipant = buildUnrealizedPnlByParticipant(roomPositions, prices)
   const statsByParticipant = new Map(tradeStatsRows.map((row) => [row.participant_id, row]))
+  const realizedByParticipant = new Map<string, number>()
 
-  roomPositions.forEach((position) => {
-    const livePrice = prices[position.symbol]
-
-    if (!livePrice) {
-      return
-    }
-
-    const pnl = calculatePnl({
-      entryPrice: position.entry_price,
-      livePrice,
-      side: position.side,
-      size: position.size,
-    })
-    pnlByParticipant.set(position.participant_id, (pnlByParticipant.get(position.participant_id) ?? 0) + pnl)
+  participants.forEach((participant) => {
+    realizedByParticipant.set(participant.id, statsByParticipant.get(participant.id)?.realized_pnl ?? 0)
   })
 
-  return participants
-    .map((participant): RankedParticipant => {
-      const unrealizedPnl = pnlByParticipant.get(participant.id) ?? 0
-      const stats = statsByParticipant.get(participant.id)
-      const realizedPnl = stats?.realized_pnl ?? 0
-      const closedTrades = stats?.closed_trades ?? 0
-      const winningTrades = stats?.winning_trades ?? 0
-      const winRate = closedTrades > 0 ? (winningTrades / closedTrades) * 100 : null
+  const scored = scoreParticipantsByTotalPnl(participants, realizedByParticipant, unrealizedByParticipant)
 
-      return {
-        ...participant,
-        realizedPnl,
-        unrealizedPnl,
-        totalPnl: realizedPnl + unrealizedPnl,
-        closedTrades,
-        winningTrades,
-        winRate,
-      }
-    })
-    .sort((a, b) => b.totalPnl - a.totalPnl || b.available_margin - a.available_margin)
+  return scored.map((participant): RankedParticipant => {
+    const stats = statsByParticipant.get(participant.id)
+    const closedTrades = stats?.closed_trades ?? 0
+    const winningTrades = stats?.winning_trades ?? 0
+    const winRate = closedTrades > 0 ? (winningTrades / closedTrades) * 100 : null
+
+    return {
+      ...participant,
+      realizedPnl: participant.realizedPnl,
+      unrealizedPnl: participant.unrealizedPnl,
+      totalPnl: participant.totalPnl,
+      closedTrades,
+      winningTrades,
+      winRate,
+    }
+  })
 }

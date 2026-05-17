@@ -125,7 +125,8 @@ export const ProfileCompetitionTable = ({ rows }: ProfileCompetitionTableProps) 
       <CardHeader>
         <CardTitle className="text-text-primary">Competition history</CardTitle>
         <p className="text-sm text-text-secondary">
-          Rankings use the same display equity as the live leaderboard. Expand a row for trades and positions.
+          Rankings and P&amp;L match the room PNL leaderboard (realized plus unrealized trade P&amp;L). Expand a row for
+          trades and positions.
         </p>
       </CardHeader>
       <CardContent className="px-0 sm:px-4">
@@ -135,7 +136,7 @@ export const ProfileCompetitionTable = ({ rows }: ProfileCompetitionTableProps) 
               <TableHead className="w-10" />
               <TableHead>Rank</TableHead>
               <TableHead>Competition</TableHead>
-              <TableHead>Entries</TableHead>
+              <TableHead>Participants</TableHead>
               <TableHead>End date</TableHead>
               <TableHead className="text-right">P&amp;L</TableHead>
             </TableRow>
@@ -188,7 +189,7 @@ export const ProfileCompetitionTable = ({ rows }: ProfileCompetitionTableProps) 
                       </div>
                     </TableCell>
                     <TableCell className="font-medium text-text-primary">{row.room.name}</TableCell>
-                    <TableCell className="font-mono text-text-secondary">{row.entryCount}</TableCell>
+                    <TableCell className="font-mono text-text-secondary">{row.participantCount}</TableCell>
                     <TableCell className="text-text-secondary">
                       {formatEndDate(row.endDateIso, row.isOngoing)}
                     </TableCell>
