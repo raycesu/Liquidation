@@ -58,6 +58,25 @@ describe("placeOrder", () => {
     getSqlMock.mockReturnValue((async () => []) as never)
   })
 
+  it("rejects market orders when margin does not cover fees", async () => {
+    fetchMarketPriceMock.mockResolvedValue(100)
+
+    const result = await placeOrder({
+      participantId: "00000000-0000-4000-8000-000000000001",
+      roomId: "00000000-0000-4000-8000-000000000002",
+      symbol: "BTCUSDT",
+      side: "LONG",
+      leverage: 10,
+      size: 10_000,
+    })
+
+    expect(result.ok).toBe(false)
+
+    if (!result.ok) {
+      expect(result.error).toBe("Insufficient margin.")
+    }
+  })
+
   it("returns a friendly error when market price fetch fails", async () => {
     fetchMarketPriceMock.mockRejectedValue(new Error("Binance unavailable"))
 

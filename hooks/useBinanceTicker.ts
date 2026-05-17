@@ -18,6 +18,8 @@ export type SymbolMarketStats = Binance24hStats
 
 export type SymbolStatsMap = Partial<Record<string, SymbolMarketStats>>
 
+export type FundingRatesMap = Partial<Record<string, number>>
+
 const parseMiniToStats = (ticker: FuturesMiniTickerWs): SymbolMarketStats | null => {
   const lastPrice = Number(ticker.c)
   const openPrice = Number(ticker.o)
@@ -41,6 +43,37 @@ const parseMiniToStats = (ticker: FuturesMiniTickerWs): SymbolMarketStats | null
     changeAbs,
     changePercent,
     quoteVolume,
+  }
+}
+
+const hlNameToCanonical = (): Map<string, string> => {
+  const map = new Map<string, string>()
+  for (const m of MARKETS) {
+    map.set(m.hlName, m.symbol)
+  }
+  return map
+}
+
+const mergeFundingRates = (
+  universe: { name: string }[],
+  assetCtxs: { funding?: string }[],
+  target: FundingRatesMap,
+  hlRev: Map<string, string>,
+) => {
+  for (let i = 0; i < universe.length && i < assetCtxs.length; i += 1) {
+    const canonical = hlRev.get(universe[i].name)
+
+    if (!canonical) {
+      continue
+    }
+
+    const rate = Number(assetCtxs[i]?.funding)
+
+    if (!Number.isFinite(rate)) {
+      continue
+    }
+
+    target[canonical] = rate
   }
 }
 
@@ -84,6 +117,7 @@ export const useBinanceTicker = () => {
   const [prices, setPrices] = useState<TickerPrices>({})
   const [statsBySymbol, setStatsBySymbol] = useState<SymbolStatsMap>({})
   const [isConnected, setIsConnected] = useState(false)
+  const [fundingRates, setFundingRates] = useState<FundingRatesMap>({})
   const xyzPrevDayRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
@@ -95,10 +129,12 @@ export const useBinanceTicker = () => {
     let binanceReconnectTimer: ReturnType<typeof setTimeout> | null = null
     let hlReconnectTimer: ReturnType<typeof setTimeout> | null = null
     const binanceRev = binanceSymbolToCanonical()
+    const hlRev = hlNameToCanonical()
 
     const loadRestSnapshot = async () => {
-      const [futuresMapResult, hlXyzResult] = await Promise.allSettled([
+      const [futuresMapResult, hlMainResult, hlXyzResult] = await Promise.allSettled([
         fetchAllFutures24hStats(),
+        fetchHlMetaAndAssetCtxs(""),
         fetchHlMetaAndAssetCtxs("xyz"),
       ])
 
@@ -128,8 +164,15 @@ export const useBinanceTicker = () => {
         }
       }
 
+      const nextFundingRates: FundingRatesMap = {}
+
+      if (hlMainResult.status === "fulfilled") {
+        mergeFundingRates(hlMainResult.value.universe, hlMainResult.value.assetCtxs, nextFundingRates, hlRev)
+      }
+
       if (hlXyzResult.status === "fulfilled") {
         const { universe, assetCtxs } = hlXyzResult.value
+        mergeFundingRates(universe, assetCtxs, nextFundingRates, hlRev)
 
         for (let i = 0; i < universe.length && i < assetCtxs.length; i += 1) {
           const name = universe[i].name
@@ -167,6 +210,9 @@ export const useBinanceTicker = () => {
 
       setPrices((c) => ({ ...c, ...nextPrices }))
       setStatsBySymbol((c) => ({ ...c, ...nextStats }))
+      if (Object.keys(nextFundingRates).length > 0) {
+        setFundingRates((current) => ({ ...current, ...nextFundingRates }))
+      }
     }
 
     void loadRestSnapshot()
@@ -335,6 +381,7 @@ export const useBinanceTicker = () => {
   return {
     prices,
     statsBySymbol,
+    fundingRates,
     isConnected,
   }
 }

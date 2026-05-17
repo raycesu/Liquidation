@@ -44,6 +44,7 @@ export type Position = {
   entry_price: number
   liquidation_price: number
   is_open: boolean
+  last_funding_hour: string | null
   created_at: string
   closed_at: string | null
 }
@@ -72,6 +73,8 @@ export type PendingOrder = {
 
 export type TradeDirection = "OPEN_LONG" | "OPEN_SHORT" | "CLOSE_LONG" | "CLOSE_SHORT"
 
+export type LiquidityRole = "MAKER" | "TAKER"
+
 export type Trade = {
   id: string
   participant_id: string
@@ -82,6 +85,19 @@ export type Trade = {
   size: number
   trade_value: number
   realized_pnl: number | null
+  fee: number
+  liquidity_role: LiquidityRole | null
+  created_at: string
+}
+
+export type FundingPayment = {
+  id: string
+  participant_id: string
+  position_id: string
+  symbol: SupportedSymbol
+  funding_rate: number
+  payment_amount: number
+  funding_hour: string
   created_at: string
 }
 

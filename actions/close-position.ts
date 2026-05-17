@@ -7,6 +7,7 @@ import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition
 import { fetchMarketPrice } from "@/lib/pricing"
 import { getSql, withUserContext } from "@/lib/db"
 import { computeManualCloseEconomics } from "@/lib/trading-engine/close-position"
+import { getTradeFeeForFill } from "@/lib/trading-fees"
 import type { ActionResult, Position, RoomParticipant, Trade } from "@/lib/types"
 
 type PositionWithParticipant = Position & {
@@ -107,6 +108,10 @@ export const closePosition = async ({
     })
     return { ok: false, error: "Unable to fetch market price. Try again in a moment." }
   }
+  const { fee: tradeFee, liquidityRole } = getTradeFeeForFill({
+    notionalUsd: position.size,
+    orderType: "MARKET",
+  })
   const { realizedPnl, nextAvailableMargin, tradeDirection } = computeManualCloseEconomics({
     entryPrice: position.entry_price,
     livePrice: finalPrice,
@@ -114,6 +119,7 @@ export const closePosition = async ({
     size: position.size,
     marginAllocated: position.margin_allocated,
     availableMargin: position.room_participants.available_margin,
+    fee: tradeFee,
   })
   const closedRows = (await sql`
     update positions
@@ -151,7 +157,9 @@ export const closePosition = async ({
       price,
       size,
       trade_value,
-      realized_pnl
+      realized_pnl,
+      fee,
+      liquidity_role
     )
     values (
       ${position.room_participants.id},
@@ -161,7 +169,9 @@ export const closePosition = async ({
       ${finalPrice},
       ${position.size},
       ${position.size},
-      ${realizedPnl}
+      ${realizedPnl},
+      ${tradeFee},
+      ${liquidityRole}
     )
     returning
       id::text,
@@ -173,6 +183,8 @@ export const closePosition = async ({
       size::float8 as size,
       trade_value::float8 as trade_value,
       realized_pnl::float8 as realized_pnl,
+      fee::float8 as fee,
+      liquidity_role,
       created_at::text
   `) as Trade[]
   const trade = tradeRows[0]

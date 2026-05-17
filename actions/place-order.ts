@@ -8,6 +8,7 @@ import { getSql, withUserContext } from "@/lib/db"
 import { getMaxLeverage, isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrice } from "@/lib/pricing"
 import { calculateLiquidationPrice, calculateRequiredMargin } from "@/lib/perpetuals"
+import { getTradeFeeForFill } from "@/lib/trading-fees"
 import { getTriggerSide } from "@/lib/trading-rules"
 import type {
   ActionResult,
@@ -88,8 +89,13 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
   }
 
   const requiredMargin = calculateRequiredMargin(parsed.data.size, parsed.data.leverage)
+  const { fee: tradeFee, liquidityRole } = getTradeFeeForFill({
+    notionalUsd: parsed.data.size,
+    orderType: "MARKET",
+  })
+  const totalCost = requiredMargin + tradeFee
 
-  if (participant.available_margin < requiredMargin) {
+  if (participant.available_margin < totalCost) {
     return { ok: false, error: "Insufficient margin." }
   }
 
@@ -137,9 +143,9 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
   const sql = getSql()
   const marginRows = (await sql`
     update room_participants
-    set available_margin = available_margin - ${requiredMargin}
+    set available_margin = available_margin - ${totalCost}
     where id = ${participant.id}
-      and available_margin >= ${requiredMargin}
+      and available_margin >= ${totalCost}
     returning available_margin::float8 as available_margin
   `) as Pick<RoomParticipant, "available_margin">[]
   const marginRow = marginRows[0]
@@ -190,7 +196,7 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
   if (!position) {
     await sql`
       update room_participants
-      set available_margin = available_margin + ${requiredMargin}
+      set available_margin = available_margin + ${totalCost}
       where id = ${participant.id}
     `
     return { ok: false, error: "Unable to place order" }
@@ -207,7 +213,9 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
       price,
       size,
       trade_value,
-      realized_pnl
+      realized_pnl,
+      fee,
+      liquidity_role
     )
     values (
       ${participant.id},
@@ -217,7 +225,9 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
       ${entryPrice},
       ${parsed.data.size},
       ${parsed.data.size},
-      null
+      null,
+      ${tradeFee},
+      ${liquidityRole}
     )
     returning
       id::text,
@@ -229,6 +239,8 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
       size::float8 as size,
       trade_value::float8 as trade_value,
       realized_pnl::float8 as realized_pnl,
+      fee::float8 as fee,
+      liquidity_role,
       created_at::text
   `) as Trade[]
   const trade = tradeRows[0]

@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils"
 import { formatNumber, formatUsd } from "@/lib/format"
 import { getMarket, getMaxLeverage } from "@/lib/markets"
 import { calculateLiquidationPrice, calculateRequiredMargin } from "@/lib/perpetuals"
+import { computeTradeFee } from "@/lib/trading-fees"
 import type { PendingOrder, Position, PositionSide, SupportedSymbol, Trade } from "@/lib/types"
 
 type OrderEntryProps = {
@@ -111,6 +112,16 @@ export const OrderEntry = ({
 
     return calculateRequiredMargin(numericSize, leverage)
   }, [leverage, numericSize])
+
+  const estimatedTradeFee = useMemo(() => {
+    if (!Number.isFinite(numericSize) || numericSize <= 0) {
+      return 0
+    }
+
+    return computeTradeFee(numericSize, orderType === "LIMIT" ? "MAKER" : "TAKER")
+  }, [numericSize, orderType])
+
+  const totalOpenCost = requiredMargin + (orderType === "MARKET" ? estimatedTradeFee : 0)
 
   const liquidationPreview = useMemo(() => {
     if (!previewEntryPrice || requiredMargin <= 0) {
@@ -256,7 +267,14 @@ export const OrderEntry = ({
       return
     }
 
-    if (availableMargin < requiredMargin) {
+    if (orderType === "MARKET" && availableMargin < totalOpenCost) {
+      setInlineError("Insufficient margin.")
+      submitInFlightRef.current = false
+      setIsSubmitting(false)
+      return
+    }
+
+    if (orderType === "LIMIT" && availableMargin < requiredMargin) {
       setInlineError("Insufficient margin.")
       submitInFlightRef.current = false
       setIsSubmitting(false)
@@ -314,6 +332,7 @@ export const OrderEntry = ({
         side,
       }),
       is_open: true,
+      last_funding_hour: null,
       created_at: new Date().toISOString(),
       closed_at: null,
     }
@@ -666,11 +685,25 @@ export const OrderEntry = ({
             </span>
           </div>
           <div className="flex items-center justify-between">
+            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Est. Trade Fee</span>
+            <span className="font-mono text-text-primary">
+              {estimatedTradeFee > 0 ? formatUsd(estimatedTradeFee) : "N/A"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
             <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Margin Required</span>
             <span className="font-mono text-text-primary">
               {requiredMargin > 0 ? formatUsd(requiredMargin) : "N/A"}
             </span>
           </div>
+          {orderType === "MARKET" ? (
+            <div className="flex items-center justify-between border-t border-border/50 pt-2">
+              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Total Cost</span>
+              <span className="font-mono text-text-primary">
+                {totalOpenCost > 0 ? formatUsd(totalOpenCost) : "N/A"}
+              </span>
+            </div>
+          ) : null}
         </div>
       </CardContent>
     </Card>

@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import type { CheckPendingOrdersResult } from "@/actions/check-pending-orders"
 import type { LiquidateRoomResult } from "@/actions/liquidate"
 import { OrderEntry } from "@/components/order-entry"
+import { TradingFeesDisclaimer } from "@/components/trading-fees-disclaimer"
 import { PositionsPanel } from "@/components/positions-panel"
 import { TradingViewChart } from "@/components/tradingview-chart"
 import { AssetSelector } from "@/components/asset-selector"
@@ -59,7 +60,7 @@ export const TradingTerminal = ({
   const [positions, setPositions] = useState(initialPositions)
   const [pendingOrders, setPendingOrders] = useState(initialPendingOrders)
   const [trades, setTrades] = useState(initialTrades)
-  const { prices, statsBySymbol, isConnected } = useBinanceTicker()
+  const { prices, statsBySymbol, fundingRates, isConnected } = useBinanceTicker()
   const selectedPrice = prices[symbol]
   const selectedStats = statsBySymbol[symbol]
   const selectedMarket = getMarket(symbol)
@@ -340,6 +341,7 @@ export const TradingTerminal = ({
               onOrderRejected={handleOrderRejected}
               onLimitOrderPlaced={handleLimitOrderPlaced}
             />
+            <TradingFeesDisclaimer symbol={symbol} fundingRate={fundingRates[symbol]} />
           </div>
         </section>
       </div>

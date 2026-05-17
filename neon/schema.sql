@@ -42,6 +42,7 @@ create table if not exists public.positions (
   entry_price numeric not null check (entry_price > 0),
   liquidation_price numeric not null check (liquidation_price > 0),
   is_open boolean not null default true,
+  last_funding_hour timestamptz,
   created_at timestamptz not null default now(),
   closed_at timestamptz
 );
@@ -74,7 +75,21 @@ create table if not exists public.trades (
   size numeric not null check (size > 0),
   trade_value numeric not null check (trade_value >= 0),
   realized_pnl numeric,
+  fee numeric not null default 0 check (fee >= 0),
+  liquidity_role text check (liquidity_role in ('MAKER', 'TAKER')),
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.funding_payments (
+  id uuid primary key default gen_random_uuid(),
+  participant_id uuid not null references public.room_participants(id) on delete cascade,
+  position_id uuid not null references public.positions(id) on delete cascade,
+  symbol text not null check (char_length(symbol) >= 3 and char_length(symbol) <= 64),
+  funding_rate numeric not null,
+  payment_amount numeric not null,
+  funding_hour timestamptz not null,
+  created_at timestamptz not null default now(),
+  unique (position_id, funding_hour)
 );
 
 create index if not exists rooms_creator_id_idx on public.rooms (creator_id);
@@ -91,6 +106,9 @@ create index if not exists orders_pending_idx on public.orders (status) where st
 create index if not exists trades_participant_id_idx on public.trades (participant_id);
 create index if not exists trades_position_id_idx on public.trades (position_id);
 create index if not exists trades_created_at_idx on public.trades (created_at desc);
+create index if not exists funding_payments_participant_id_idx on public.funding_payments (participant_id);
+create index if not exists funding_payments_position_id_idx on public.funding_payments (position_id);
+create index if not exists positions_last_funding_hour_idx on public.positions (last_funding_hour) where is_open = true;
 
 create or replace function public.current_app_user_id()
 returns text
@@ -112,6 +130,7 @@ alter table public.room_participants enable row level security;
 alter table public.positions enable row level security;
 alter table public.orders enable row level security;
 alter table public.trades enable row level security;
+alter table public.funding_payments enable row level security;
 
 drop policy if exists users_select_self on public.users;
 create policy users_select_self
@@ -334,5 +353,26 @@ with check (
     from public.room_participants rp
     where rp.id = trades.participant_id
       and rp.user_id = public.current_app_user_id()
+  )
+);
+
+drop policy if exists funding_payments_select_room_members on public.funding_payments;
+create policy funding_payments_select_room_members
+on public.funding_payments
+for select
+using (
+  exists (
+    select 1
+    from public.room_participants rp_owner
+    where rp_owner.id = funding_payments.participant_id
+      and (
+        rp_owner.user_id = public.current_app_user_id()
+        or exists (
+          select 1
+          from public.room_participants rp_viewer
+          where rp_viewer.room_id = rp_owner.room_id
+            and rp_viewer.user_id = public.current_app_user_id()
+        )
+      )
   )
 );

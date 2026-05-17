@@ -31,6 +31,7 @@ export type TradingEngineRoomSummary = {
   filledOrders: number
   cancelledOrders: number
   closedPositions: number
+  fundingApplied: number
   liquidated: number
 }
 
@@ -39,6 +40,7 @@ export type RunTradingEngineSummary = {
   totalFilledOrders: number
   totalCancelledOrders: number
   totalClosedPositions: number
+  totalFundingApplied: number
   totalLiquidated: number
   rooms: TradingEngineRoomSummary[]
 }

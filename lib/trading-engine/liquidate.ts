@@ -71,7 +71,9 @@ const liquidatePositionBatch = async (
           price,
           size,
           trade_value,
-          realized_pnl
+          realized_pnl,
+          fee,
+          liquidity_role
         )
         select
           cp.participant_id,
@@ -81,7 +83,9 @@ const liquidatePositionBatch = async (
           ${livePrice},
           cp.size,
           cp.size,
-          ${realizedPnl}
+          ${realizedPnl},
+          0,
+          null
         from closed_position cp
         returning id::text
       )

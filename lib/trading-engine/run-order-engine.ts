@@ -5,6 +5,7 @@ import { fetchMarketPrices } from "@/lib/pricing"
 import { getSql } from "@/lib/db"
 import { calculateLiquidationPrice } from "@/lib/perpetuals"
 import { computeManualCloseEconomics } from "@/lib/trading-engine/close-position"
+import { getTradeFeeForFill } from "@/lib/trading-fees"
 import {
   getLimitFillPrice,
   getTriggerPriority,
@@ -253,6 +254,15 @@ export const runOrderEngineForRoom = async (
         side: positionSide,
       })
       const tradeDirection = positionSide === "LONG" ? "OPEN_LONG" : "OPEN_SHORT"
+      const participantAvailableMargin = participantMargins.get(order.participant_id) ?? 0
+      const { fee: makerFee, liquidityRole } = getTradeFeeForFill({
+        notionalUsd: order.size,
+        orderType: "LIMIT",
+      })
+
+      if (participantAvailableMargin < makerFee) {
+        continue
+      }
 
       const fillRows = (await sql`
         with claimed as (
@@ -300,6 +310,13 @@ export const runOrderEngineForRoom = async (
             created_at::text,
             closed_at::text
         ),
+        deducted_fee as (
+          update room_participants
+          set available_margin = greatest(0, available_margin - ${makerFee})
+          where id = (select participant_id from claimed limit 1)
+            and exists (select 1 from inserted_position)
+          returning available_margin::float8 as available_margin
+        ),
         inserted_trade as (
           insert into trades (
             participant_id,
@@ -309,7 +326,9 @@ export const runOrderEngineForRoom = async (
             price,
             size,
             trade_value,
-            realized_pnl
+            realized_pnl,
+            fee,
+            liquidity_role
           )
           select
             inserted_position.participant_id,
@@ -319,7 +338,9 @@ export const runOrderEngineForRoom = async (
             ${fillPrice},
             inserted_position.size,
             inserted_position.size,
-            null
+            null,
+            ${makerFee},
+            ${liquidityRole}
           from inserted_position
           returning
             id::text,
@@ -331,21 +352,33 @@ export const runOrderEngineForRoom = async (
             size::float8 as size,
             trade_value::float8 as trade_value,
             realized_pnl::float8 as realized_pnl,
+            fee::float8 as fee,
+            liquidity_role,
             created_at::text
         )
         select
           claimed.order_id,
           row_to_json(inserted_position)::jsonb as position,
-          row_to_json(inserted_trade)::jsonb as trade
+          row_to_json(inserted_trade)::jsonb as trade,
+          (select available_margin from deducted_fee limit 1) as available_margin
         from claimed
         join inserted_position on true
         left join inserted_trade on true
-      `) as { order_id: string; position: Position; trade: Trade | null }[]
+      `) as {
+        order_id: string
+        position: Position
+        trade: Trade | null
+        available_margin: number | null
+      }[]
 
-      const fillRow = fillRows[0] as LimitFillRow | undefined
+      const fillRow = fillRows[0] as (LimitFillRow & { available_margin: number | null }) | undefined
 
       if (!fillRow?.position) {
         continue
+      }
+
+      if (fillRow.available_margin != null) {
+        participantMargins.set(order.participant_id, fillRow.available_margin)
       }
 
       newPositions.push(fillRow.position)
@@ -452,6 +485,10 @@ export const runOrderEngineForRoom = async (
     }
 
     const availableMargin = participantMargins.get(order.participant_id) ?? 0
+    const { fee: tradeFee, liquidityRole } = getTradeFeeForFill({
+      notionalUsd: attachedPosition.size,
+      orderType: order.type,
+    })
     const { realizedPnl, nextAvailableMargin, tradeDirection } = computeManualCloseEconomics({
       entryPrice: attachedPosition.entry_price,
       livePrice: positionPrice,
@@ -459,6 +496,7 @@ export const runOrderEngineForRoom = async (
       size: attachedPosition.size,
       marginAllocated: attachedPosition.margin_allocated,
       availableMargin,
+      fee: tradeFee,
     })
 
     const triggerRows = (await sql`
@@ -509,7 +547,9 @@ export const runOrderEngineForRoom = async (
           price,
           size,
           trade_value,
-          realized_pnl
+          realized_pnl,
+          fee,
+          liquidity_role
         )
         select
           closed_position.participant_id,
@@ -519,7 +559,9 @@ export const runOrderEngineForRoom = async (
           ${positionPrice},
           closed_position.size,
           closed_position.size,
-          ${realizedPnl}
+          ${realizedPnl},
+          ${tradeFee},
+          ${liquidityRole}
         from closed_position
         returning
           id::text,
@@ -531,6 +573,8 @@ export const runOrderEngineForRoom = async (
           size::float8 as size,
           trade_value::float8 as trade_value,
           realized_pnl::float8 as realized_pnl,
+          fee::float8 as fee,
+          liquidity_role,
           created_at::text
       )
       select

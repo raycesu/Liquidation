@@ -11,6 +11,7 @@ export const computeManualCloseEconomics = ({
   size,
   marginAllocated,
   availableMargin,
+  fee = 0,
 }: {
   entryPrice: number
   livePrice: number
@@ -18,10 +19,11 @@ export const computeManualCloseEconomics = ({
   size: number
   marginAllocated: number
   availableMargin: number
+  fee?: number
 }) => {
   const rawPnl = calculatePnl({ entryPrice, livePrice, side, size })
   const realizedPnl = floorRealizedPnl(rawPnl, marginAllocated)
-  const nextAvailableMargin = Math.max(0, availableMargin + marginAllocated + realizedPnl)
+  const nextAvailableMargin = Math.max(0, availableMargin + marginAllocated + realizedPnl - fee)
 
   return {
     realizedPnl,

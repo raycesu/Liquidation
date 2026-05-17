@@ -78,6 +78,7 @@ export default async function TradePage({ params }: TradePageProps) {
       entry_price::float8 as entry_price,
       liquidation_price::float8 as liquidation_price,
       is_open,
+      last_funding_hour::text,
       created_at::text,
       closed_at::text
     from positions
@@ -120,6 +121,8 @@ export default async function TradePage({ params }: TradePageProps) {
       size::float8 as size,
       trade_value::float8 as trade_value,
       realized_pnl::float8 as realized_pnl,
+      fee::float8 as fee,
+      liquidity_role,
       created_at::text
     from trades
     where participant_id = ${participant.id}

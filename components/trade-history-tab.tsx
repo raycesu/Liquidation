@@ -33,6 +33,7 @@ export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
           <TableHead>Price</TableHead>
           <TableHead>Size</TableHead>
           <TableHead>Trade Value</TableHead>
+          <TableHead>Fee</TableHead>
           <TableHead>Closed PNL</TableHead>
         </TableRow>
       </TableHeader>
@@ -58,6 +59,9 @@ export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
                   {baseSize > 0 ? `${baseSize.toFixed(4)} ${trade.symbol.replace("USDT", "")}` : formatUsd(trade.size)}
                 </TableCell>
                 <TableCell className="font-mono">{formatUsd(trade.trade_value)}</TableCell>
+                <TableCell className="font-mono text-text-secondary">
+                  {trade.fee > 0 ? formatUsd(trade.fee) : "—"}
+                </TableCell>
                 <TableCell className={`font-mono ${isClose ? pnlClassName : "text-text-secondary"}`}>
                   {isClose ? formatUsd(realizedPnl) : "—"}
                 </TableCell>
@@ -66,7 +70,7 @@ export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
           })
         ) : (
           <TableRow className="border-border/40 hover:bg-transparent">
-            <TableCell colSpan={7} className="h-24 text-center text-text-secondary">
+            <TableCell colSpan={8} className="h-24 text-center text-text-secondary">
               No trades yet
             </TableCell>
           </TableRow>

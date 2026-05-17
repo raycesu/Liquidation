@@ -27,7 +27,9 @@ Signed-out visitors see a **marketing landing page** at `/`. Signed-in users wit
 - **Order entry** — **Market** and **limit** orders, leverage up to per-asset caps (from Hyperliquid metadata, up to 50× where the schema allows), size in USD or base, and optional **take-profit / stop-loss** on entry.
 - **Positions** — Open positions with live mark context, close positions, and attach or edit **TP/SL triggers** on existing positions.
 - **Open orders** — Pending limit and trigger orders with cancel support.
-- **Trade history** — Fills and realized PnL for the current room participant.
+- **Trade history** — Fills, fees, and realized PnL for the current room participant.
+- **Trading fees** — Maker **0.02%** on limit fills; taker **0.05%** on market opens and closes (TP/SL, manual close). No trading fee on liquidation.
+- **Funding** — Hourly Hyperliquid-sourced funding applied by the background engine (longs pay / shorts receive when the HL rate is positive).
 - **Order watcher** — Server-side checks for pending limits and triggers as prices move (`lib/trading-rules.ts`); **liquidation** uses live marks when positions cross liquidation price.
 
 ### Profile and account

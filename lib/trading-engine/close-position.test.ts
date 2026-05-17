@@ -41,6 +41,20 @@ describe("computeManualCloseEconomics", () => {
     expect(result.realizedPnl).toBe(100)
     expect(result.nextAvailableMargin).toBe(700)
   })
+
+  it("deducts trade fee from available margin on close", () => {
+    const result = computeManualCloseEconomics({
+      entryPrice: 100,
+      livePrice: 110,
+      side: "LONG",
+      size: 1000,
+      marginAllocated: 100,
+      availableMargin: 500,
+      fee: 5,
+    })
+
+    expect(result.nextAvailableMargin).toBe(695)
+  })
 })
 
 describe("computeLiquidationRealizedPnl", () => {
