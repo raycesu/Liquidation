@@ -6,6 +6,8 @@ const engineDir = join(process.cwd(), "lib", "trading-engine")
 const engineFiles = [
   "run-order-engine.ts",
   "liquidate.ts",
+  "settle-room.ts",
+  "run-settlement.ts",
   "run-trading-engine.ts",
   "types.ts",
 ]

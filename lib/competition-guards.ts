@@ -1,4 +1,4 @@
-import { getCompetitionPhase } from "@/lib/room-competition-status"
+import { getCompetitionPhase, isRoomSettled } from "@/lib/room-competition-status"
 import { getSql, withUserContext } from "@/lib/db"
 import type { ActionResult, Room, RoomParticipant } from "@/lib/types"
 
@@ -6,6 +6,10 @@ export const TRADING_CLOSED_MESSAGE = "Trading is only available while the compe
 export const COMPETITION_ENDED_MESSAGE = "This competition has ended"
 
 export const assertRoomTradingOpen = (room: Room, now: Date = new Date()): ActionResult<void> => {
+  if (isRoomSettled(room)) {
+    return { ok: false, error: TRADING_CLOSED_MESSAGE }
+  }
+
   if (getCompetitionPhase(room, now) !== "ongoing") {
     return { ok: false, error: TRADING_CLOSED_MESSAGE }
   }
@@ -14,7 +18,7 @@ export const assertRoomTradingOpen = (room: Room, now: Date = new Date()): Actio
 }
 
 export const assertRoomJoinable = (room: Room, now: Date = new Date()): ActionResult<void> => {
-  if (getCompetitionPhase(room, now) === "ended") {
+  if (isRoomSettled(room) || getCompetitionPhase(room, now) === "ended") {
     return { ok: false, error: COMPETITION_ENDED_MESSAGE }
   }
 
@@ -49,6 +53,7 @@ export const loadRoomForParticipant = async (
         'start_date', r.start_date::text,
         'end_date', r.end_date::text,
         'is_active', r.is_active,
+        'settled_at', r.settled_at::text,
         'created_at', r.created_at::text
       ) as room
     from room_participants rp

@@ -1,8 +1,9 @@
 import { mapWithConcurrency } from "@/lib/concurrency"
+import { getSql } from "@/lib/db"
 import { runLiquidationEngineForRoom } from "@/lib/trading-engine/liquidate"
 import { runFundingEngineForRoom } from "@/lib/trading-engine/run-funding-engine"
 import { runOrderEngineForRoom } from "@/lib/trading-engine/run-order-engine"
-import { getSql } from "@/lib/db"
+import { runSettlementForDueRooms } from "@/lib/trading-engine/run-settlement"
 import type { RunTradingEngineSummary, TradingEngineRoomSummary } from "@/lib/trading-engine/types"
 
 export type { RunTradingEngineSummary, TradingEngineRoomSummary } from "@/lib/trading-engine/types"
@@ -10,14 +11,20 @@ export type { RunTradingEngineSummary, TradingEngineRoomSummary } from "@/lib/tr
 const ACTIVE_ROOM_CONCURRENCY = 5
 
 export const runTradingEngineForActiveRooms = async (): Promise<RunTradingEngineSummary> => {
+  const settlement = await runSettlementForDueRooms()
+
   const sql = getSql()
-  const activeRooms = (await sql`
+  const nowIso = new Date().toISOString()
+  const ongoingRooms = (await sql`
     select id::text
     from rooms
     where is_active = true
+      and settled_at is null
+      and start_date <= ${nowIso}::timestamptz
+      and end_date > ${nowIso}::timestamptz
   `) as { id: string }[]
 
-  const rooms = await mapWithConcurrency(activeRooms, ACTIVE_ROOM_CONCURRENCY, async (room) => {
+  const rooms = await mapWithConcurrency(ongoingRooms, ACTIVE_ROOM_CONCURRENCY, async (room) => {
     const orderResult = await runOrderEngineForRoom(room.id, { revalidate: true })
     const fundingResult = await runFundingEngineForRoom(room.id)
     const liquidationResult = await runLiquidationEngineForRoom(room.id, { revalidate: true })
@@ -45,7 +52,8 @@ export const runTradingEngineForActiveRooms = async (): Promise<RunTradingEngine
   const totalLiquidated = rooms.reduce((sum, room) => sum + room.liquidated, 0)
 
   return {
-    processedRooms: activeRooms.length,
+    settlement,
+    processedRooms: ongoingRooms.length,
     totalFilledOrders,
     totalCancelledOrders,
     totalClosedPositions,

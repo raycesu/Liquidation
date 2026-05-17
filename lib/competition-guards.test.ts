@@ -16,6 +16,7 @@ const baseRoom: Room = {
   start_date: "2026-05-01T00:00:00.000Z",
   end_date: "2026-05-31T23:59:59.000Z",
   is_active: true,
+  settled_at: null,
   created_at: "2026-04-01T00:00:00.000Z",
 }
 
@@ -38,6 +39,16 @@ describe("assertRoomTradingOpen", () => {
   it("blocks trading when room is inactive", () => {
     const now = new Date("2026-05-15T12:00:00.000Z")
     expect(assertRoomTradingOpen({ ...baseRoom, is_active: false }, now)).toEqual({
+      ok: false,
+      error: TRADING_CLOSED_MESSAGE,
+    })
+  })
+
+  it("blocks trading when room is settled", () => {
+    const now = new Date("2026-05-15T12:00:00.000Z")
+    expect(
+      assertRoomTradingOpen({ ...baseRoom, settled_at: "2026-05-31T23:59:59.000Z" }, now),
+    ).toEqual({
       ok: false,
       error: TRADING_CLOSED_MESSAGE,
     })

@@ -124,6 +124,7 @@ export const createRoom = async (
             start_date::text,
             end_date::text,
             is_active,
+            settled_at::text,
             created_at::text
         `) as Room[]
         room = rooms[0] ?? null
@@ -198,6 +199,7 @@ export const joinRoom = async (joinCode: string): Promise<ActionResult<JoinRoomD
         start_date::text as start_date,
         end_date::text as end_date,
         is_active,
+        settled_at::text as settled_at,
         created_at::text as created_at
       from rooms
       where join_code = ${parsedJoinCode.data}

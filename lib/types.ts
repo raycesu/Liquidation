@@ -22,6 +22,7 @@ export type Room = {
   start_date: string
   end_date: string
   is_active: boolean
+  settled_at: string | null
   created_at: string
 }
 

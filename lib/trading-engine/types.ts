@@ -35,7 +35,23 @@ export type TradingEngineRoomSummary = {
   liquidated: number
 }
 
+export type SettlementRoomSummary = {
+  roomId: string
+  ok: boolean
+  error?: string
+  cancelledOrders: number
+  closedPositions: number
+}
+
+export type RunSettlementSummary = {
+  dueRooms: number
+  settledRooms: number
+  failedRooms: number
+  rooms: SettlementRoomSummary[]
+}
+
 export type RunTradingEngineSummary = {
+  settlement: RunSettlementSummary
   processedRooms: number
   totalFilledOrders: number
   totalCancelledOrders: number

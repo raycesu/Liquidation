@@ -124,7 +124,8 @@ const parseCount = (value: string | number) => {
   return Number.isFinite(n) ? n : 0
 }
 
-const roomIsOngoing = (room: Room) => room.is_active && new Date(room.end_date) > new Date()
+const roomIsOngoing = (room: Room) =>
+  room.is_active && room.settled_at == null && new Date(room.end_date) > new Date()
 
 const buildOpenMarginByParticipant = (openRows: OpenPositionRow[]) => {
   const marginByParticipant = new Map<string, number>()
@@ -158,6 +159,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
         'start_date', r.start_date::text,
         'end_date', r.end_date::text,
         'is_active', r.is_active,
+        'settled_at', r.settled_at::text,
         'created_at', r.created_at::text
       ) as rooms
     from room_participants rp

@@ -19,6 +19,7 @@ create table if not exists public.rooms (
   start_date timestamptz not null default now(),
   end_date timestamptz not null,
   is_active boolean not null default true,
+  settled_at timestamptz,
   created_at timestamptz not null default now()
 );
 

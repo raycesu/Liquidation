@@ -126,6 +126,7 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
       start_date::text,
       end_date::text,
       is_active,
+      settled_at::text,
       created_at::text
     from rooms
     where id = ${roomId}

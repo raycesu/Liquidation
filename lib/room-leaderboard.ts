@@ -110,6 +110,17 @@ export const getRoomLeaderboard = async (roomId: string, page?: string | string[
 
 export const getRankedParticipants = async (roomId: string, participants: ParticipantWithUser[]) => {
   const sql = getSql()
+  const roomRows = (await sql`
+    select settled_at::text, end_date::text
+    from rooms
+    where id = ${roomId}
+    limit 1
+  `) as { settled_at: string | null; end_date: string }[]
+  const roomMeta = roomRows[0]
+  const lockRanking =
+    roomMeta?.settled_at != null ||
+    (roomMeta?.end_date != null && new Date(roomMeta.end_date).getTime() <= Date.now())
+
   const [tradeStatsRows, roomPositions] = (await Promise.all([
     sql`
       select
@@ -139,8 +150,10 @@ export const getRankedParticipants = async (roomId: string, participants: Partic
   ])) as [TradeStatsRow[], RoomPosition[]]
 
   const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol)))
-  const prices = symbols.length > 0 ? await fetchMarketPrices(symbols) : {}
-  const unrealizedByParticipant = buildUnrealizedPnlByParticipant(roomPositions, prices)
+  const prices = !lockRanking && symbols.length > 0 ? await fetchMarketPrices(symbols) : {}
+  const unrealizedByParticipant = lockRanking
+    ? new Map<string, number>()
+    : buildUnrealizedPnlByParticipant(roomPositions, prices)
   const statsByParticipant = new Map(tradeStatsRows.map((row) => [row.participant_id, row]))
   const realizedByParticipant = new Map<string, number>()
 

@@ -33,6 +33,7 @@ export default async function TradePage({ params }: TradePageProps) {
       start_date::text as start_date,
       end_date::text as end_date,
       is_active,
+      settled_at::text as settled_at,
       created_at::text as created_at
     from rooms
     where id = ${roomId}

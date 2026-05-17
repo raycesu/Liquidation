@@ -35,6 +35,7 @@ export default async function DashboardPage() {
         'start_date', r.start_date::text,
         'end_date', r.end_date::text,
         'is_active', r.is_active,
+        'settled_at', r.settled_at::text,
         'created_at', r.created_at::text
       ) as rooms
     from room_participants rp

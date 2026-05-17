@@ -41,6 +41,8 @@ export const runFundingEngineForRoom = async (roomId: string): Promise<RunFundin
     join rooms r on r.id = rp.room_id
     where rp.room_id = ${roomId}
       and r.is_active = true
+      and r.settled_at is null
+      and r.end_date > now()
       and p.is_open = true
       and (
         p.last_funding_hour is null
@@ -140,6 +142,9 @@ export const runFundingEngineForActiveRooms = async () => {
     select id::text
     from rooms
     where is_active = true
+      and settled_at is null
+      and start_date <= now()
+      and end_date > now()
   `) as { id: string }[]
 
   let totalApplied = 0
