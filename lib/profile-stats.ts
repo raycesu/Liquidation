@@ -40,12 +40,6 @@ type OpenPositionRow = Position & {
   room_id: string
 }
 
-type EntryCountRow = {
-  participant_id: string
-  room_id: string
-  entry_count: string | number
-}
-
 type PositionStyleRow = {
   side: PositionSide
   leverage: number
@@ -79,6 +73,7 @@ type LastTradeRow = {
 type RealizedPnlRow = {
   participant_id: string
   realized_pnl: number
+  closed_trade_count: string | number
 }
 
 const EPS = 1e-6
@@ -190,7 +185,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     }
   }
 
-  const [allRoomParticipants, openPositions, realizedPnlRows, entryRows, stylePositions, symbolRows, roeRows, lastTradeRows] =
+  const [allRoomParticipants, openPositions, realizedPnlRows, stylePositions, symbolRows, roeRows, lastTradeRows] =
     (await Promise.all([
       sql`
         select
@@ -234,7 +229,8 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
       sql`
         select
           t.participant_id::text,
-          coalesce(sum(t.realized_pnl), 0)::float8 as realized_pnl
+          coalesce(sum(t.realized_pnl), 0)::float8 as realized_pnl,
+          count(*)::int as closed_trade_count
         from trades t
         join room_participants rp on rp.id = t.participant_id
         where exists (
@@ -246,19 +242,6 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
           and t.direction in ('CLOSE_LONG', 'CLOSE_SHORT')
           and t.realized_pnl is not null
         group by t.participant_id
-      `,
-      sql`
-        select
-          rp.id::text as participant_id,
-          rp.room_id::text as room_id,
-          (
-            select count(*)::int
-            from trades t
-            where t.participant_id = rp.id
-              and t.direction in ('OPEN_LONG', 'OPEN_SHORT')
-          ) as entry_count
-        from room_participants rp
-        where rp.user_id = ${userId}
       `,
       sql`
         select
@@ -315,7 +298,6 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
       PlainParticipantRow[],
       OpenPositionRow[],
       RealizedPnlRow[],
-      EntryCountRow[],
       PositionStyleRow[],
       SymbolCountRow[],
       ClosedTradeRoeRow[],
@@ -338,18 +320,15 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
   const unrealizedByParticipant = buildUnrealizedPnlByParticipant(openPositions, prices)
 
   const realizedByParticipant = new Map<string, number>()
+  const closedTradeCountByParticipant = new Map<string, number>()
   realizedPnlRows.forEach((row) => {
     realizedByParticipant.set(row.participant_id, row.realized_pnl)
+    closedTradeCountByParticipant.set(row.participant_id, parseCount(row.closed_trade_count))
   })
 
   const openByParticipant = new Map<string, boolean>()
   openPositions.forEach((p) => {
     openByParticipant.set(p.participant_id, true)
-  })
-
-  const entryByParticipant = new Map<string, number>()
-  entryRows.forEach((row) => {
-    entryByParticipant.set(row.participant_id, parseCount(row.entry_count))
   })
 
   const participantCountByRoom = new Map<string, number>()
@@ -429,7 +408,12 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
 
   const tradingStyle = buildTradingStyle(stylePositions, symbolRows)
 
-  const shareRoomOptions = buildShareRoomOptions(competitionRows, roeRows, participantCountByRoom, entryByParticipant)
+  const shareRoomOptions = buildShareRoomOptions(
+    competitionRows,
+    roeRows,
+    participantCountByRoom,
+    closedTradeCountByParticipant,
+  )
 
   return {
     competitionRows,
@@ -511,7 +495,7 @@ const buildShareRoomOptions = (
   competitionRows: ProfileCompetitionRow[],
   roeRows: ClosedTradeRoeRow[],
   participantCountByRoom: Map<string, number>,
-  entryByParticipant: Map<string, number>,
+  closedTradeCountByParticipant: Map<string, number>,
 ): ProfileShareRoomOption[] =>
   competitionRows.map((comp) => {
     const roomTrades = roeRows.filter((r) => r.room_id === comp.room.id)
@@ -521,7 +505,7 @@ const buildShareRoomOptions = (
       participantId: comp.participantId,
       placementRank: comp.placementRank,
       pnlPercent: comp.pnlPercent,
-      entryCount: entryByParticipant.get(comp.participantId) ?? 0,
+      closedTradeCount: closedTradeCountByParticipant.get(comp.participantId) ?? 0,
       participantCount: participantCountByRoom.get(comp.room.id) ?? comp.participantCount,
       startDateIso: comp.room.start_date,
       endDateIso: comp.endDateIso,

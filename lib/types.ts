@@ -163,7 +163,7 @@ export type ProfileShareRoomOption = {
   participantId: string
   placementRank: number
   pnlPercent: number
-  entryCount: number
+  closedTradeCount: number
   participantCount: number
   startDateIso: string
   endDateIso: string

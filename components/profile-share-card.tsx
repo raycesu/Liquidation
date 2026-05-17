@@ -334,7 +334,7 @@ const ShareCardCanvas = forwardRef<HTMLDivElement, ShareCardCanvasProps>(functio
             <span> traders</span>
             <span className="mx-2 text-white/30">·</span>
             <span>Number of trades: </span>
-            <span className="font-mono text-white">{option.entryCount}</span>
+            <span className="font-mono text-white">{option.closedTradeCount}</span>
           </p>
           <p className="mt-2 text-base text-white/50">{dateRange}</p>
 

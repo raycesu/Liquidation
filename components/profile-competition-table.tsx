@@ -2,12 +2,13 @@
 
 import { Fragment, useState } from "react"
 import { getProfileRoomBreakdown } from "@/actions/get-profile-room-breakdown"
-import { TradeHistoryTab } from "@/components/trade-history-tab"
+import { ProfileCompetitionBreakdownStrip } from "@/components/profile/profile-competition-breakdown-strip"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { formatNumber, formatPercent } from "@/lib/format"
+import { formatPercent } from "@/lib/format"
+import { computeProfileRoomCompetitionStats } from "@/lib/profile-room-competition-stats"
 import type { Position, ProfileCompetitionRow, Trade } from "@/lib/types"
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react"
 
@@ -20,6 +21,8 @@ type BreakdownState =
 type ProfileCompetitionTableProps = {
   rows: ProfileCompetitionRow[]
 }
+
+const competitionHistoryTitleClass = "text-xl font-semibold text-text-primary sm:text-2xl"
 
 const formatEndDate = (iso: string, isOngoing: boolean) => {
   if (isOngoing) {
@@ -37,22 +40,6 @@ const formatEndDate = (iso: string, isOngoing: boolean) => {
     month: "short",
     day: "numeric",
   })
-}
-
-const rankMedal = (rank: number) => {
-  if (rank === 1) {
-    return "Gold"
-  }
-
-  if (rank === 2) {
-    return "Silver"
-  }
-
-  if (rank === 3) {
-    return "Bronze"
-  }
-
-  return null
 }
 
 const rankBadgeClass = (rank: number) => {
@@ -111,7 +98,7 @@ export const ProfileCompetitionTable = ({ rows }: ProfileCompetitionTableProps) 
     return (
       <Card className="border-border bg-surface">
         <CardHeader>
-          <CardTitle className="text-text-primary">Competition history</CardTitle>
+          <CardTitle className={competitionHistoryTitleClass}>Competition History</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-text-secondary">No competitions yet. Join a room from the dashboard to get started.</p>
@@ -123,11 +110,7 @@ export const ProfileCompetitionTable = ({ rows }: ProfileCompetitionTableProps) 
   return (
     <Card className="border-border bg-surface">
       <CardHeader>
-        <CardTitle className="text-text-primary">Competition history</CardTitle>
-        <p className="text-sm text-text-secondary">
-          Rankings and P&amp;L match the room PNL leaderboard (realized plus unrealized trade P&amp;L). Expand a row for
-          trades and positions.
-        </p>
+        <CardTitle className={competitionHistoryTitleClass}>Competition History</CardTitle>
       </CardHeader>
       <CardContent className="px-0 sm:px-4">
         <Table>
@@ -143,7 +126,6 @@ export const ProfileCompetitionTable = ({ rows }: ProfileCompetitionTableProps) 
           </TableHeader>
           <TableBody>
             {rows.map((row) => {
-              const medal = rankMedal(row.placementRank)
               const isOpen = expandedRoomId === row.room.id
               const breakdown = breakdownByRoom[row.room.id]
 
@@ -179,14 +161,9 @@ export const ProfileCompetitionTable = ({ rows }: ProfileCompetitionTableProps) 
                       </Button>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className={`font-mono ${rankBadgeClass(row.placementRank)}`}>
-                          #{row.placementRank}
-                        </Badge>
-                        {medal ? (
-                          <span className="text-xs font-medium text-text-secondary">{medal}</span>
-                        ) : null}
-                      </div>
+                      <Badge variant="outline" className={`font-mono ${rankBadgeClass(row.placementRank)}`}>
+                        #{row.placementRank}
+                      </Badge>
                     </TableCell>
                     <TableCell className="font-medium text-text-primary">{row.room.name}</TableCell>
                     <TableCell className="font-mono text-text-secondary">{row.participantCount}</TableCell>
@@ -212,16 +189,9 @@ export const ProfileCompetitionTable = ({ rows }: ProfileCompetitionTableProps) 
                           <p className="text-sm text-loss">{breakdown.message}</p>
                         ) : null}
                         {breakdown?.status === "ready" ? (
-                          <div className="flex flex-col gap-6">
-                            <div>
-                              <h3 className="mb-2 text-sm font-semibold text-text-primary">Positions</h3>
-                              <PositionSummaryTable positions={breakdown.positions} />
-                            </div>
-                            <div>
-                              <h3 className="mb-2 text-sm font-semibold text-text-primary">Trades</h3>
-                              <TradeHistoryTab trades={breakdown.trades} />
-                            </div>
-                          </div>
+                          <ProfileCompetitionBreakdownStrip
+                            stats={computeProfileRoomCompetitionStats(breakdown.trades, breakdown.positions)}
+                          />
                         ) : null}
                       </TableCell>
                     </TableRow>
@@ -233,36 +203,5 @@ export const ProfileCompetitionTable = ({ rows }: ProfileCompetitionTableProps) 
         </Table>
       </CardContent>
     </Card>
-  )
-}
-
-const PositionSummaryTable = ({ positions }: { positions: Position[] }) => {
-  if (positions.length === 0) {
-    return <p className="text-sm text-text-secondary">No positions in this room.</p>
-  }
-
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Symbol</TableHead>
-          <TableHead>Side</TableHead>
-          <TableHead>Lev</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Entry</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {positions.map((p) => (
-          <TableRow key={p.id}>
-            <TableCell className="font-mono text-text-primary">{p.symbol.replace("USDT", "")}</TableCell>
-            <TableCell className={p.side === "LONG" ? "text-profit" : "text-loss"}>{p.side}</TableCell>
-            <TableCell className="font-mono">{p.leverage}x</TableCell>
-            <TableCell className="text-text-secondary">{p.is_open ? "Open" : "Closed"}</TableCell>
-            <TableCell className="font-mono">{formatNumber(p.entry_price)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
   )
 }
