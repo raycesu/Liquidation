@@ -1,3 +1,5 @@
+import { getMarket } from "@/lib/markets"
+
 export const formatUsd = (value: number) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -42,6 +44,16 @@ export const formatCompactUsd = (value: number) => {
   }
 
   return formatUsd(value)
+}
+
+export const formatShareAssetLabel = (symbol: string) => {
+  const market = getMarket(symbol)
+
+  if (market?.base) {
+    return market.base
+  }
+
+  return symbol.replace(/^xyz:/i, "").replace(/USDT$/i, "")
 }
 
 export const formatProfileDate = (iso: string) => {

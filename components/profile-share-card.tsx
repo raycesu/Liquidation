@@ -1,12 +1,13 @@
 "use client"
 
-import { forwardRef, useEffect, useId, useMemo, useRef, useState } from "react"
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react"
 import { toPng } from "html-to-image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { BRAND_LOGO_HEIGHT, BRAND_LOGO_PATH, BRAND_LOGO_WIDTH, BRAND_NAME } from "@/lib/brand"
-import { formatPercent, formatProfileDate } from "@/lib/format"
+import { BRAND_LOGO_HEIGHT, BRAND_LOGO_SRC, BRAND_LOGO_WIDTH, BRAND_NAME } from "@/lib/brand"
+import { MarketingBackdropLayers } from "@/components/marketing/marketing-backdrop-layers"
+import { formatPercent, formatProfileDate, formatShareAssetLabel } from "@/lib/format"
 import type { ProfileShareRoomOption, ProfileShareTradeHighlight } from "@/lib/types"
 import { Download, Loader2 } from "lucide-react"
 
@@ -20,15 +21,15 @@ const cardHeight = 630
 
 const CARD_BG = "#050a14"
 const CARD_RING = "#173a60"
-const ACCENT_BLUE = "#0a8cff"
-const ACCENT_NEON = "#17c9ff"
+
+const formatTradeCountLabel = (count: number) => `${count} trade${count === 1 ? "" : "s"}`
 
 const directionLabel = (side: ProfileShareTradeHighlight["side"]) => (side === "LONG" ? "LONG" : "SHORT")
 
 const badgeClassForSide = (side: ProfileShareTradeHighlight["side"]) =>
   side === "LONG"
-    ? "bg-emerald-500/20 text-emerald-100 ring-1 ring-emerald-400/35"
-    : "bg-rose-500/25 text-rose-50 ring-1 ring-rose-400/40"
+    ? "border border-emerald-400/35 bg-emerald-500/20 text-emerald-100"
+    : "border border-rose-400/40 bg-rose-500/25 text-rose-50"
 
 const slugify = (value: string) =>
   value
@@ -41,20 +42,37 @@ const pnlColorClass = (value: number) => (value >= 0 ? "text-[#00c97a]" : "text-
 const logoAspectRatio = BRAND_LOGO_WIDTH / BRAND_LOGO_HEIGHT
 
 const resolveLogoAbsoluteUrl = (assetBaseUrl: string) => {
-  if (assetBaseUrl) {
-    return `${assetBaseUrl.replace(/\/$/, "")}${BRAND_LOGO_PATH}`
+  const baseUrl = assetBaseUrl || (typeof window !== "undefined" ? window.location.origin : "")
+
+  if (!baseUrl) {
+    return BRAND_LOGO_SRC
   }
 
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}${BRAND_LOGO_PATH}`
-  }
-
-  return BRAND_LOGO_PATH
+  return new URL(BRAND_LOGO_SRC, baseUrl).toString()
 }
 
 const loadLogoAsDataUrl = async (absoluteUrl: string): Promise<string | null> => {
   if (typeof window === "undefined") {
     return null
+  }
+
+  try {
+    const response = await fetch(absoluteUrl, { cache: "no-store" })
+
+    if (response.ok) {
+      const blob = await response.blob()
+
+      return await new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          resolve(typeof reader.result === "string" ? reader.result : null)
+        }
+        reader.onerror = () => resolve(null)
+        reader.readAsDataURL(blob)
+      })
+    }
+  } catch {
+    // Fall back to drawing the image if fetch is blocked by the current environment.
   }
 
   const fromCanvas = await new Promise<string | null>((resolve) => {
@@ -85,26 +103,7 @@ const loadLogoAsDataUrl = async (absoluteUrl: string): Promise<string | null> =>
     return fromCanvas
   }
 
-  try {
-    const response = await fetch(absoluteUrl)
-
-    if (!response.ok) {
-      return null
-    }
-
-    const blob = await response.blob()
-
-    return await new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        resolve(typeof reader.result === "string" ? reader.result : null)
-      }
-      reader.onerror = () => resolve(null)
-      reader.readAsDataURL(blob)
-    })
-  } catch {
-    return null
-  }
+  return null
 }
 
 const waitForLogoImage = async (img: HTMLImageElement, dataUrl: string) => {
@@ -258,20 +257,47 @@ type ShareCardCanvasProps = {
   logoSrc: string
 }
 
+const RankHero = ({ placementRank, participantCount }: { placementRank: number; participantCount: number }) => {
+  return (
+    <div className="relative flex flex-1 items-center justify-center" aria-hidden>
+      <div className="pointer-events-none absolute right-8 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-[#0f8dff]/20 blur-[70px]" />
+      <svg
+        viewBox="0 0 280 280"
+        className="pointer-events-none absolute h-[300px] w-[300px] text-[#0f8dff]/25"
+        aria-hidden
+      >
+        <circle cx="140" cy="140" r="128" fill="none" stroke="currentColor" strokeWidth="1" />
+        <circle cx="140" cy="140" r="104" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.7" />
+        <circle cx="140" cy="140" r="80" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.45" />
+        <circle cx="140" cy="140" r="56" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.25" />
+      </svg>
+      <div
+        className="relative flex size-[240px] flex-col items-center justify-center rounded-full ring-2 ring-[#17c9ff]/45"
+        style={{ boxShadow: "0 0 48px rgb(23 201 255 / 0.12)" }}
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#9eb8d6]">Rank</p>
+        <p className="mt-1 font-mono text-8xl font-bold leading-none text-white">#{placementRank}</p>
+        <p className="mt-2 text-center text-base text-white/60">
+          of {participantCount} trader{participantCount === 1 ? "" : "s"}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 const ShareCardCanvas = forwardRef<HTMLDivElement, ShareCardCanvasProps>(function ShareCardCanvas(
   { option, logoSrc },
   ref,
 ) {
-  const gradientId = `dropletGrad-${useId().replace(/:/g, "")}`
-  const glowId = `dropletGlow-${useId().replace(/:/g, "")}`
   const pnlClass = pnlColorClass(option.pnlPercent)
   const endLabel = option.isOngoing ? "Ongoing" : formatProfileDate(option.endDateIso)
-  const dateRange = `${formatProfileDate(option.startDateIso)} – ${endLabel}`
+  const subtitle = `${formatProfileDate(option.startDateIso)} – ${endLabel} · ${formatTradeCountLabel(option.closedTradeCount)}`
 
   return (
     <div
       ref={ref}
-      className="relative flex overflow-hidden rounded-2xl text-white ring-1"
+      data-theme="marketing-dark"
+      className="relative isolate flex rounded-2xl text-white"
       style={{
         width: cardWidth,
         height: cardHeight,
@@ -280,82 +306,54 @@ const ShareCardCanvas = forwardRef<HTMLDivElement, ShareCardCanvasProps>(functio
         boxShadow: `inset 0 0 0 1px ${CARD_RING}`,
       }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0a8cff]/10 via-transparent to-[#17c9ff]/5" aria-hidden />
-
-      <div className="pointer-events-none absolute -right-8 top-1/2 w-[42%] -translate-y-1/2" aria-hidden>
-        <svg viewBox="0 0 200 260" className="h-full w-full" preserveAspectRatio="xMaxYMid meet">
-          <defs>
-            <radialGradient id={glowId} cx="50%" cy="40%" r="55%">
-              <stop offset="0%" stopColor={ACCENT_NEON} stopOpacity="0.45" />
-              <stop offset="100%" stopColor={ACCENT_BLUE} stopOpacity="0" />
-            </radialGradient>
-            <linearGradient id={gradientId} x1="30%" y1="0%" x2="70%" y2="100%">
-              <stop offset="0%" stopColor={ACCENT_NEON} stopOpacity="0.95" />
-              <stop offset="100%" stopColor={ACCENT_BLUE} stopOpacity="0.75" />
-            </linearGradient>
-          </defs>
-          <ellipse cx="100" cy="130" rx="90" ry="100" fill={`url(#${glowId})`} />
-          <path
-            d="M100 28 C72 28 52 58 52 92 C52 138 100 198 100 198 C100 198 148 138 148 92 C148 58 128 28 100 28 Z"
-            fill={`url(#${gradientId})`}
-            opacity={0.88}
-          />
-          <path
-            d="M100 28 C72 28 52 58 52 92 C52 138 100 198 100 198 C100 198 148 138 148 92 C148 58 128 28 100 28 Z"
-            fill="none"
-            stroke={ACCENT_NEON}
-            strokeWidth="2"
-            opacity={0.35}
-          />
-        </svg>
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" aria-hidden>
+        <MarketingBackdropLayers
+          layerClassName="absolute inset-0 z-0"
+          glowClassName="pointer-events-none absolute inset-x-0 top-0 z-0 mx-auto h-48 max-w-3xl rounded-full bg-[#17c9ff]/10 blur-[80px]"
+        />
       </div>
 
-      <div className="relative z-10 flex w-full flex-col justify-between p-10 pr-[38%]">
-        <div style={{ width: 220, height: Math.round(220 / logoAspectRatio) }}>
-          {logoSrc ? (
-            // eslint-disable-next-line @next/next/no-img-element -- html-to-image needs plain img + data URL
-            <img
-              data-share-logo
-              src={logoSrc}
-              alt={`${BRAND_NAME} logo`}
-              width={BRAND_LOGO_WIDTH}
-              height={BRAND_LOGO_HEIGHT}
-              className="block h-full w-full object-contain object-left"
-            />
-          ) : null}
-        </div>
+      <div className="relative z-10 flex w-full min-w-0">
+        <div className="flex min-w-0 flex-[0_0_62%] flex-col justify-between p-10">
+          <div style={{ width: 170, height: Math.round(170 / logoAspectRatio) }}>
+            {logoSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element -- html-to-image needs plain img + data URL
+              <img
+                data-share-logo
+                src={logoSrc}
+                alt={`${BRAND_NAME} logo`}
+                width={BRAND_LOGO_WIDTH}
+                height={BRAND_LOGO_HEIGHT}
+                className="block h-full w-full object-contain object-left"
+              />
+            ) : null}
+          </div>
 
-        <div className="mt-6 flex flex-1 flex-col">
-          <h2 className="text-4xl font-bold leading-tight tracking-tight text-white">{option.room.name}</h2>
-          <p className="mt-3 text-lg text-white/70">
-            <span className="font-mono text-white">#{option.placementRank}</span>
-            <span className="text-white/40"> of </span>
-            <span className="font-mono text-white">{option.participantCount}</span>
-            <span> traders</span>
-            <span className="mx-2 text-white/30">·</span>
-            <span>Number of trades: </span>
-            <span className="font-mono text-white">{option.closedTradeCount}</span>
-          </p>
-          <p className="mt-2 text-base text-white/50">{dateRange}</p>
+          <div className="mt-5 flex flex-1 flex-col">
+            <h2 className="text-4xl font-bold leading-tight tracking-tight text-white">{option.room.name}</h2>
+            <p className="mt-2 text-lg text-white/60">{subtitle}</p>
 
-          <div className={`mt-5 text-7xl font-bold leading-none ${pnlClass}`}>
-            {option.pnlPercent >= 0 ? "+" : ""}
-            {formatPercent(option.pnlPercent)}
+            <div className={`mt-5 text-7xl font-bold leading-none ${pnlClass}`}>
+              {option.pnlPercent >= 0 ? "+" : ""}
+              {formatPercent(option.pnlPercent)}
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/45">Top trades</p>
+            {option.topTrades.length === 0 ? (
+              <p className="mt-3 text-sm text-white/40">No closed trades yet.</p>
+            ) : (
+              <ul className="mt-3 w-full space-y-2">
+                {option.topTrades.map((trade, index) => (
+                  <TopTradeRow key={trade.tradeId} rank={index + 1} trade={trade} />
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 
-        <div className="mt-6 border-t border-white/10 pt-5">
-          <p className="text-xs font-semibold uppercase tracking-widest text-white/45">Top trades</p>
-          {option.topTrades.length === 0 ? (
-            <p className="mt-3 text-sm text-white/40">No closed trades yet.</p>
-          ) : (
-            <ul className="mt-3 space-y-2.5">
-              {option.topTrades.map((trade, index) => (
-                <TopTradeRow key={trade.tradeId} rank={index + 1} trade={trade} />
-              ))}
-            </ul>
-          )}
-        </div>
+        <RankHero placementRank={option.placementRank} participantCount={option.participantCount} />
       </div>
     </div>
   )
@@ -367,19 +365,23 @@ type TopTradeRowProps = {
 }
 
 const TopTradeRow = ({ rank, trade }: TopTradeRowProps) => {
-  const assetLabel = trade.symbol.replace("USDT", "")
+  const assetLabel = formatShareAssetLabel(trade.symbol)
   const tradePnlClass = pnlColorClass(trade.roePercent)
 
   return (
-    <li className="flex items-center gap-4 text-base">
-      <span className="w-6 font-mono text-sm text-white/40">{rank}</span>
-      <span className="min-w-[4rem] text-lg font-semibold text-white">{assetLabel}</span>
+    <li
+      className="box-border flex w-full items-center gap-3 overflow-hidden border border-white/10 bg-white/[0.04] px-4 py-3 text-base"
+      style={{ borderRadius: 12 }}
+    >
+      <span className="w-5 shrink-0 font-mono text-sm text-white/40">{rank}</span>
+      <span className="min-w-[3.5rem] shrink-0 font-semibold text-white">{assetLabel}</span>
       <span
-        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${badgeClassForSide(trade.side)}`}
+        className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${badgeClassForSide(trade.side)}`}
+        style={{ borderRadius: 9999 }}
       >
         {directionLabel(trade.side)} {trade.leverage}x
       </span>
-      <span className={`ml-auto font-mono text-lg font-semibold ${tradePnlClass}`}>
+      <span className={`ml-auto shrink-0 font-mono font-semibold ${tradePnlClass}`}>
         {trade.roePercent >= 0 ? "+" : ""}
         {formatPercent(trade.roePercent)}
       </span>
