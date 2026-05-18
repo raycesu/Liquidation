@@ -106,11 +106,21 @@ const loadLogoAsDataUrl = async (absoluteUrl: string): Promise<string | null> =>
   return null
 }
 
-const waitForLogoImage = async (img: HTMLImageElement, dataUrl: string) => {
-  img.src = dataUrl
+const waitForNextFrame = async () => {
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve())
+    })
+  })
+}
 
-  if (typeof img.decode === "function") {
-    await img.decode()
+const waitForExistingLogoImage = async (img: HTMLImageElement) => {
+  if (img.complete && img.naturalWidth > 0) {
+    if (typeof img.decode === "function") {
+      await img.decode().catch(() => undefined)
+    }
+
+    await waitForNextFrame()
     return
   }
 
@@ -118,6 +128,52 @@ const waitForLogoImage = async (img: HTMLImageElement, dataUrl: string) => {
     img.onload = () => resolve()
     img.onerror = () => reject(new Error("Logo failed to load"))
   })
+  await waitForNextFrame()
+}
+
+const loadImageElement = async (src: string) =>
+  await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error("Image failed to load"))
+    img.src = src
+  })
+
+const compositeLogoOntoExport = async ({
+  exportedDataUrl,
+  logoDataUrl,
+  logoRect,
+  cardRect,
+}: {
+  exportedDataUrl: string
+  logoDataUrl: string
+  logoRect: DOMRect
+  cardRect: DOMRect
+}) => {
+  const [exportedImage, logoImage] = await Promise.all([
+    loadImageElement(exportedDataUrl),
+    loadImageElement(logoDataUrl),
+  ])
+  const canvas = document.createElement("canvas")
+  canvas.width = exportedImage.naturalWidth
+  canvas.height = exportedImage.naturalHeight
+  const ctx = canvas.getContext("2d")
+
+  if (!ctx) {
+    return exportedDataUrl
+  }
+
+  const scaleX = canvas.width / cardRect.width
+  const scaleY = canvas.height / cardRect.height
+  const logoX = (logoRect.left - cardRect.left) * scaleX
+  const logoY = (logoRect.top - cardRect.top) * scaleY
+  const logoWidth = logoRect.width * scaleX
+  const logoHeight = logoRect.height * scaleY
+
+  ctx.drawImage(exportedImage, 0, 0)
+  ctx.drawImage(logoImage, logoX, logoY, logoWidth, logoHeight)
+
+  return canvas.toDataURL("image/png")
 }
 
 export const ProfileShareCardSection = ({ shareRoomOptions, assetBaseUrl }: ProfileShareCardSectionProps) => {
@@ -131,26 +187,28 @@ export const ProfileShareCardSection = ({ shareRoomOptions, assetBaseUrl }: Prof
     [shareRoomOptions, selectedRoomId],
   )
 
-  const [logoAbsoluteUrl, setLogoAbsoluteUrl] = useState("")
+  const logoAbsoluteUrl = useMemo(() => resolveLogoAbsoluteUrl(assetBaseUrl), [assetBaseUrl])
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null)
+  const [hasLogoLoadError, setHasLogoLoadError] = useState(false)
 
   useEffect(() => {
-    setLogoAbsoluteUrl(resolveLogoAbsoluteUrl(assetBaseUrl))
-  }, [assetBaseUrl])
-
-  useEffect(() => {
-    if (!logoAbsoluteUrl) {
-      return
-    }
-
     let cancelled = false
+    setLogoDataUrl(null)
+    setHasLogoLoadError(false)
 
     const preload = async () => {
       const dataUrl = await loadLogoAsDataUrl(logoAbsoluteUrl)
 
-      if (!cancelled) {
-        setLogoDataUrl(dataUrl)
+      if (cancelled) {
+        return
       }
+
+      if (!dataUrl) {
+        setHasLogoLoadError(true)
+        return
+      }
+
+      setLogoDataUrl(dataUrl)
     }
 
     void preload()
@@ -160,12 +218,12 @@ export const ProfileShareCardSection = ({ shareRoomOptions, assetBaseUrl }: Prof
     }
   }, [logoAbsoluteUrl])
 
-  const logoSrc = logoDataUrl ?? logoAbsoluteUrl
+  const isShareCardReady = Boolean(selectedOption && logoDataUrl)
 
   const handleExportPng = async () => {
     const node = cardRef.current
 
-    if (!node || !selectedOption) {
+    if (!node || !selectedOption || !logoDataUrl) {
       return
     }
 
@@ -173,18 +231,27 @@ export const ProfileShareCardSection = ({ shareRoomOptions, assetBaseUrl }: Prof
 
     try {
       const logoImg = node.querySelector<HTMLImageElement>("img[data-share-logo]")
-      const embedded =
-        logoDataUrl ?? (logoAbsoluteUrl ? await loadLogoAsDataUrl(logoAbsoluteUrl) : null)
 
-      if (logoImg && embedded) {
-        await waitForLogoImage(logoImg, embedded)
+      if (!logoImg) {
+        return
       }
 
-      const dataUrl = await toPng(node, {
+      await waitForExistingLogoImage(logoImg)
+
+      const cardRect = node.getBoundingClientRect()
+      const logoRect = logoImg.getBoundingClientRect()
+      const dataUrlWithoutLogo = await toPng(node, {
         pixelRatio: 2,
         cacheBust: true,
         width: cardWidth,
         height: cardHeight,
+        filter: (domNode) => !(domNode instanceof HTMLImageElement && domNode.dataset.shareLogo === "true"),
+      })
+      const dataUrl = await compositeLogoOntoExport({
+        exportedDataUrl: dataUrlWithoutLogo,
+        logoDataUrl,
+        logoRect,
+        cardRect,
       })
       const anchor = document.createElement("a")
       anchor.href = dataUrl
@@ -232,20 +299,26 @@ export const ProfileShareCardSection = ({ shareRoomOptions, assetBaseUrl }: Prof
             style={{ width: cardWidth * 0.48, height: cardHeight * 0.48 }}
           >
             {selectedOption ? (
-              <ShareCardCanvas ref={cardRef} option={selectedOption} logoSrc={logoSrc} />
+              <ShareCardCanvas ref={cardRef} option={selectedOption} logoSrc={logoDataUrl} />
             ) : null}
           </div>
         </div>
 
+        {hasLogoLoadError ? (
+          <p className="text-sm text-rose-300">
+            The logo could not be prepared for export. Refresh the page and try again.
+          </p>
+        ) : null}
+
         <Button
           type="button"
           onClick={() => void handleExportPng()}
-          disabled={!selectedOption || isExporting}
+          disabled={!isShareCardReady || isExporting}
           className="w-fit gap-2"
           aria-label="Download share card as PNG"
         >
           {isExporting ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}
-          {isExporting ? "Exporting…" : "Download PNG"}
+          {isExporting ? "Exporting…" : logoDataUrl ? "Download PNG" : "Preparing logo…"}
         </Button>
       </CardContent>
     </Card>
@@ -254,7 +327,7 @@ export const ProfileShareCardSection = ({ shareRoomOptions, assetBaseUrl }: Prof
 
 type ShareCardCanvasProps = {
   option: ProfileShareRoomOption
-  logoSrc: string
+  logoSrc: string | null
 }
 
 const RankHero = ({ placementRank, participantCount }: { placementRank: number; participantCount: number }) => {
@@ -319,7 +392,7 @@ const ShareCardCanvas = forwardRef<HTMLDivElement, ShareCardCanvasProps>(functio
             {logoSrc ? (
               // eslint-disable-next-line @next/next/no-img-element -- html-to-image needs plain img + data URL
               <img
-                data-share-logo
+                data-share-logo="true"
                 src={logoSrc}
                 alt={`${BRAND_NAME} logo`}
                 width={BRAND_LOGO_WIDTH}

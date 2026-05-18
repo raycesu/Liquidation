@@ -1,6 +1,8 @@
 "use client"
 
+import { TablePagination } from "@/components/table-pagination"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useClientPagination } from "@/hooks/use-client-pagination"
 import { formatDateTime, formatNumber, formatUsd } from "@/lib/format"
 import type { Trade, TradeDirection } from "@/lib/types"
 
@@ -23,7 +25,10 @@ const directionClassName: Record<TradeDirection, string> = {
 }
 
 export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
+  const { visibleItems: visibleTrades, currentPage, totalPages, pageItems, setPage } = useClientPagination(trades)
+
   return (
+    <>
     <Table className="text-xs [&_td]:px-3 [&_td]:py-2.5">
       <TableHeader className="[&_tr]:border-border/50 [&_th]:h-9 [&_th]:px-3 [&_th]:text-[10px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.14em] [&_th]:text-text-secondary">
         <TableRow className="hover:bg-transparent">
@@ -39,7 +44,7 @@ export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
       </TableHeader>
       <TableBody>
         {trades.length > 0 ? (
-          trades.map((trade) => {
+          visibleTrades.map((trade) => {
             const baseSize = trade.price > 0 ? trade.size / trade.price : 0
             const isClose = trade.direction === "CLOSE_LONG" || trade.direction === "CLOSE_SHORT"
             const realizedPnl = trade.realized_pnl ?? 0
@@ -77,5 +82,14 @@ export const TradeHistoryTab = ({ trades }: TradeHistoryTabProps) => {
         )}
       </TableBody>
     </Table>
+
+    <TablePagination
+      currentPage={currentPage}
+      totalPages={totalPages}
+      pageItems={pageItems}
+      onPageChange={setPage}
+      ariaLabelPrefix="Trade history"
+    />
+    </>
   )
 }

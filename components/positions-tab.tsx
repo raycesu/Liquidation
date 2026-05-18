@@ -14,7 +14,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { TablePagination } from "@/components/table-pagination"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useClientPagination } from "@/hooks/use-client-pagination"
 import type { TickerPrices } from "@/hooks/useBinanceTicker"
 import { formatNumber, formatPercent, formatUsd } from "@/lib/format"
 import { calculatePnl, calculateRoe } from "@/lib/perpetuals"
@@ -51,6 +53,8 @@ export const PositionsTab = ({
   onTriggersUpdated,
 }: PositionsTabProps) => {
   const [isPending, startTransition] = useTransition()
+  const { visibleItems: visiblePositions, currentPage, totalPages, pageItems, setPage } =
+    useClientPagination(positions)
   const [editingPosition, setEditingPosition] = useState<Position | null>(null)
   const [tpDraft, setTpDraft] = useState("")
   const [slDraft, setSlDraft] = useState("")
@@ -132,7 +136,7 @@ export const PositionsTab = ({
         </TableHeader>
         <TableBody>
           {positions.length > 0 ? (
-            positions.map((position) => {
+            visiblePositions.map((position) => {
               const livePrice = prices[position.symbol]
               const markPrice = livePrice ?? position.entry_price
               const positionValue = (position.size / position.entry_price) * markPrice
@@ -206,6 +210,14 @@ export const PositionsTab = ({
           )}
         </TableBody>
       </Table>
+
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageItems={pageItems}
+        onPageChange={setPage}
+        ariaLabelPrefix="Positions"
+      />
 
       <Dialog open={editingPosition != null} onOpenChange={(open) => !open && setEditingPosition(null)}>
         <DialogContent>

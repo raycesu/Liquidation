@@ -4,7 +4,9 @@ import { useMemo, useTransition } from "react"
 import { toast } from "sonner"
 import { cancelOrder } from "@/actions/cancel-order"
 import { Button } from "@/components/ui/button"
+import { TablePagination } from "@/components/table-pagination"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useClientPagination } from "@/hooks/use-client-pagination"
 import { formatDateTime, formatNumber, formatUsd } from "@/lib/format"
 import type { CancelOrderResult } from "@/actions/cancel-order"
 import type { PendingOrder } from "@/lib/types"
@@ -72,6 +74,8 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
     () => orders.filter((order) => !order.parent_order_id),
     [orders],
   )
+  const { visibleItems: paginatedOrders, currentPage, totalPages, pageItems, setPage } =
+    useClientPagination(visibleOrders)
 
   const handleCancel = (orderId: string) => {
     startTransition(async () => {
@@ -88,6 +92,7 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
   }
 
   return (
+    <>
     <Table className="text-xs [&_td]:px-3 [&_td]:py-2.5">
       <TableHeader className="[&_tr]:border-border/50 [&_th]:h-9 [&_th]:px-3 [&_th]:text-[10px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.14em] [&_th]:text-text-secondary">
         <TableRow className="hover:bg-transparent">
@@ -104,7 +109,7 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
       </TableHeader>
       <TableBody>
         {visibleOrders.length > 0 ? (
-          visibleOrders.map((order) => {
+          paginatedOrders.map((order) => {
             const sideClassName = order.side === "LONG" ? "text-profit" : "text-loss"
             const triggerGroupKey = order.position_id ?? order.id
             const groupedTriggers = triggerSummaryByGroupKey[triggerGroupKey] ?? null
@@ -153,5 +158,14 @@ export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTa
         )}
       </TableBody>
     </Table>
+
+    <TablePagination
+      currentPage={currentPage}
+      totalPages={totalPages}
+      pageItems={pageItems}
+      onPageChange={setPage}
+      ariaLabelPrefix="Open orders"
+    />
+    </>
   )
 }
