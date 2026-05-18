@@ -8,6 +8,7 @@ import { TablePagination } from "@/components/table-pagination"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useClientPagination } from "@/hooks/use-client-pagination"
 import { formatDateTime, formatNumber, formatUsd } from "@/lib/format"
+import { getVisibleOpenOrders } from "@/lib/open-orders-display"
 import type { CancelOrderResult } from "@/actions/cancel-order"
 import type { PendingOrder } from "@/lib/types"
 
@@ -70,10 +71,7 @@ const buildTriggerSummaryMap = (orders: PendingOrder[]) => {
 export const OpenOrdersTab = ({ roomId, orders, onOrderCancelled }: OpenOrdersTabProps) => {
   const [isPending, startTransition] = useTransition()
   const triggerSummaryByGroupKey = useMemo(() => buildTriggerSummaryMap(orders), [orders])
-  const visibleOrders = useMemo(
-    () => orders.filter((order) => !order.parent_order_id),
-    [orders],
-  )
+  const visibleOrders = useMemo(() => getVisibleOpenOrders(orders), [orders])
   const { visibleItems: paginatedOrders, currentPage, totalPages, pageItems, setPage } =
     useClientPagination(visibleOrders)
 
