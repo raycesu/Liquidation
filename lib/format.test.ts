@@ -1,4 +1,31 @@
-import { formatShareAssetLabel } from "@/lib/format"
+import {
+  formatPnlWithPercent,
+  formatShareAssetLabel,
+  formatUsdRounded,
+  formatUsdTenCents,
+} from "@/lib/format"
+
+describe("formatUsdRounded", () => {
+  it("rounds to the nearest dollar", () => {
+    expect(formatUsdRounded(1830.4)).toBe("$1,830")
+    expect(formatUsdRounded(-54488.49)).toBe("-$54,488")
+  })
+})
+
+describe("formatUsdTenCents", () => {
+  it("rounds to the nearest ten cents without trailing zeros", () => {
+    expect(formatUsdTenCents(1711.7)).toBe("$1,711.7")
+    expect(formatUsdTenCents(1830.58)).toBe("$1,830.6")
+    expect(formatUsdTenCents(-54488.49)).toBe("-$54,488.5")
+    expect(formatUsdTenCents(-60352)).toBe("-$60,352")
+  })
+})
+
+describe("formatPnlWithPercent", () => {
+  it("combines USD and percent return", () => {
+    expect(formatPnlWithPercent(-427175.15, -42.72)).toBe("-$427,175.15 (-42.72%)")
+  })
+})
 
 describe("formatShareAssetLabel", () => {
   it("strips USDT suffix from crypto symbols", () => {

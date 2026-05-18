@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { formatPercent, formatUsd } from "@/lib/format"
+import { formatPercent, formatPnlWithPercent, formatUsd } from "@/lib/format"
+import { computePnlPercentFromTotalPnl } from "@/lib/participant-pnl"
 import type { LeaderboardPageData } from "@/lib/room-leaderboard"
 
 type PnlLeaderboardSectionProps = {
   leaderboardPage: LeaderboardPageData
   participantCount: number
+  startingBalance: number
   getPageHref: (page: number) => string
 }
 
@@ -37,6 +39,7 @@ const getPnlClassName = (pnl: number) => {
 export const PnlLeaderboardSection = ({
   leaderboardPage,
   participantCount,
+  startingBalance,
   getPageHref,
 }: PnlLeaderboardSectionProps) => {
   const { currentPage, totalPages, pageStartIndex, visibleParticipants, pageItems } = leaderboardPage
@@ -117,7 +120,10 @@ export const PnlLeaderboardSection = ({
                         </div>
                       </TableCell>
                       <TableCell className={`text-left font-semibold tabular-nums ${getPnlClassName(participant.totalPnl)}`}>
-                        {formatUsd(participant.totalPnl)}
+                        {formatPnlWithPercent(
+                          participant.totalPnl,
+                          computePnlPercentFromTotalPnl(participant.totalPnl, startingBalance),
+                        )}
                       </TableCell>
                       <TableCell className="text-center tabular-nums text-accent-neon">
                         {participant.winRate == null ? "--" : formatPercent(participant.winRate)}

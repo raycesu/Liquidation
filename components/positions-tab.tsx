@@ -18,7 +18,14 @@ import { TablePagination } from "@/components/table-pagination"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useClientPagination } from "@/hooks/use-client-pagination"
 import type { TickerPrices } from "@/hooks/useBinanceTicker"
-import { formatNumber, formatPercent, formatUsd } from "@/lib/format"
+import {
+  formatNumber,
+  formatPercent,
+  formatShareAssetLabel,
+  formatUsd,
+  formatUsdRounded,
+  formatUsdTenCents,
+} from "@/lib/format"
 import { calculatePnl, calculateRoe } from "@/lib/perpetuals"
 import type { ClosePositionResult } from "@/actions/close-position"
 import type { SetPositionTriggersResult } from "@/actions/set-position-triggers"
@@ -161,23 +168,23 @@ export const PositionsTab = ({
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-semibold text-text-primary">
-                        {position.symbol.replace("USDT", "")}
+                        {formatShareAssetLabel(position.symbol)}
                       </span>
                       <span className={`text-xs font-semibold ${sideClassName}`}>
                         {position.leverage}x {position.side === "LONG" ? "Long" : "Short"}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono">{formatUsd(position.size)}</TableCell>
-                  <TableCell className="font-mono">{formatUsd(positionValue)}</TableCell>
+                  <TableCell className="font-mono">{formatUsdRounded(position.size)}</TableCell>
+                  <TableCell className="font-mono">{formatUsdRounded(positionValue)}</TableCell>
                   <TableCell className="font-mono">{formatNumber(position.entry_price)}</TableCell>
                   <TableCell className="font-mono">{formatNumber(markPrice)}</TableCell>
                   <TableCell className={`font-mono ${pnlClassName}`}>
-                    {formatUsd(unrealizedPnl)}{" "}
+                    {formatUsdTenCents(unrealizedPnl)}{" "}
                     <span className="text-xs">({formatPercent(roe)})</span>
                   </TableCell>
                   <TableCell className="font-mono">{formatNumber(position.liquidation_price)}</TableCell>
-                  <TableCell className="font-mono">{formatUsd(position.margin_allocated)}</TableCell>
+                  <TableCell className="font-mono">{formatUsdRounded(position.margin_allocated)}</TableCell>
                   <TableCell>
                     <button
                       type="button"

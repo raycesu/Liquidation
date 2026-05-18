@@ -13,6 +13,25 @@ export const formatWholeUsd = (value: number) =>
     minimumFractionDigits: 0,
   }).format(value)} USD`
 
+export const formatUsdRounded = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(Math.round(value))
+
+export const formatUsdTenCents = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+  }).format(Math.round(value * 10) / 10)
+
+export const formatPnlWithPercent = (totalPnl: number, pnlPercent: number) =>
+  `${formatUsd(totalPnl)} (${formatPercent(pnlPercent)})`
+
 export const formatNumber = (value: number, maximumFractionDigits = 2) =>
   new Intl.NumberFormat("en-US", {
     maximumFractionDigits,

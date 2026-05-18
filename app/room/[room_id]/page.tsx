@@ -254,6 +254,7 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
         <PnlLeaderboardSection
           leaderboardPage={leaderboardPage}
           participantCount={rankedParticipants.length}
+          startingBalance={room.starting_balance}
           getPageHref={(page) => `/room/${room.id}?page=${page}`}
         />
       </div>

@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatUsd } from "@/lib/format"
+import { formatWholeUsd } from "@/lib/format"
 import { getCompetitionPhase } from "@/lib/room-competition-status"
 import type { Room } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -63,7 +63,7 @@ export const RoomCard = ({ room }: RoomCardProps) => {
         </dl>
         <div className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Starting capital</p>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">{formatUsd(room.starting_balance)}</p>
+          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">{formatWholeUsd(room.starting_balance)}</p>
         </div>
         <Button asChild className="w-full font-medium shadow-sm shadow-primary/15" size="lg">
           <Link href={`/room/${room.id}`}>Open lobby</Link>
