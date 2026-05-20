@@ -2,6 +2,7 @@ import {
   computeLiquidationRealizedPnl,
   computeManualCloseEconomics,
   getCloseTradeDirection,
+  isPositionLiquidatable,
   isPositionUnderwater,
 } from "@/lib/trading-engine/close-position"
 
@@ -86,5 +87,22 @@ describe("isPositionUnderwater", () => {
     expect(
       isPositionUnderwater({ side: "SHORT", liquidation_price: 60_000 }, 59_999),
     ).toBe(false)
+  })
+})
+
+describe("isPositionLiquidatable", () => {
+  it("liquidates when equity is at or below maintenance even if price has not hit liq", () => {
+    expect(
+      isPositionLiquidatable(
+        {
+          side: "LONG",
+          liquidation_price: 50_000,
+          margin_allocated: 40,
+          entry_price: 100_000,
+          size: 10_000,
+        },
+        100_000,
+      ),
+    ).toBe(true)
   })
 })

@@ -4,7 +4,7 @@ import { fetchMarketPrices } from "@/lib/pricing"
 import {
   computeLiquidationRealizedPnl,
   getCloseTradeDirection,
-  isPositionUnderwater,
+  isPositionLiquidatable,
 } from "@/lib/trading-engine/close-position"
 import type { ActionResult, Position, SupportedSymbol } from "@/lib/types"
 import type { RunLiquidationEngineResult } from "@/lib/trading-engine/types"
@@ -37,7 +37,7 @@ const liquidatePositionBatch = async (
       continue
     }
 
-    if (!isPositionUnderwater(position, livePrice)) {
+    if (!isPositionLiquidatable(position, livePrice)) {
       continue
     }
 

@@ -121,7 +121,7 @@ export const getRankedParticipants = async (roomId: string, participants: Partic
     roomMeta?.settled_at != null ||
     (roomMeta?.end_date != null && new Date(roomMeta.end_date).getTime() <= Date.now())
 
-  const [tradeStatsRows, roomPositions] = (await Promise.all([
+  const [tradeStatsRows, fundingStatsRows, roomPositions] = (await Promise.all([
     sql`
       select
         t.participant_id::text,
@@ -137,6 +137,18 @@ export const getRankedParticipants = async (roomId: string, participants: Partic
     `,
     sql`
       select
+        fp.participant_id::text,
+        coalesce(
+          sum(coalesce(fp.actual_applied, fp.payment_amount)),
+          0
+        )::float8 as funding_pnl
+      from funding_payments fp
+      join room_participants rp on rp.id = fp.participant_id
+      where rp.room_id = ${roomId}
+      group by fp.participant_id
+    `,
+    sql`
+      select
         p.participant_id::text,
         p.symbol,
         p.side,
@@ -147,7 +159,7 @@ export const getRankedParticipants = async (roomId: string, participants: Partic
       where p.is_open = true
         and rp.room_id = ${roomId}
     `,
-  ])) as [TradeStatsRow[], RoomPosition[]]
+  ])) as [TradeStatsRow[], { participant_id: string; funding_pnl: number }[], RoomPosition[]]
 
   const symbols = Array.from(new Set(roomPositions.map((position) => position.symbol)))
   const prices = !lockRanking && symbols.length > 0 ? await fetchMarketPrices(symbols) : {}
@@ -155,10 +167,13 @@ export const getRankedParticipants = async (roomId: string, participants: Partic
     ? new Map<string, number>()
     : buildUnrealizedPnlByParticipant(roomPositions, prices)
   const statsByParticipant = new Map(tradeStatsRows.map((row) => [row.participant_id, row]))
+  const fundingByParticipant = new Map(fundingStatsRows.map((row) => [row.participant_id, row.funding_pnl]))
   const realizedByParticipant = new Map<string, number>()
 
   participants.forEach((participant) => {
-    realizedByParticipant.set(participant.id, statsByParticipant.get(participant.id)?.realized_pnl ?? 0)
+    const tradeRealized = statsByParticipant.get(participant.id)?.realized_pnl ?? 0
+    const fundingRealized = fundingByParticipant.get(participant.id) ?? 0
+    realizedByParticipant.set(participant.id, tradeRealized + fundingRealized)
   })
 
   const scored = scoreParticipantsByTotalPnl(participants, realizedByParticipant, unrealizedByParticipant)

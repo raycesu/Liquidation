@@ -58,8 +58,26 @@ describe("placeOrder", () => {
     getSqlMock.mockReturnValue((async () => []) as never)
   })
 
-  it("rejects market orders when margin does not cover fees", async () => {
+  it("rejects market orders when available margin is below initial margin", async () => {
     fetchMarketPriceMock.mockResolvedValue(100)
+    loadRoomForParticipantMock.mockResolvedValue({
+      ok: true,
+      data: {
+        room: {
+          id: "room-1",
+          start_date: "2020-01-01",
+          end_date: "2099-01-01",
+          is_active: true,
+        },
+        participant: {
+          id: "00000000-0000-4000-8000-000000000001",
+          room_id: "00000000-0000-4000-8000-000000000002",
+          user_id: "user-1",
+          available_margin: 500,
+          created_at: "2026-01-01T00:00:00.000Z",
+        },
+      },
+    } as never)
 
     const result = await placeOrder({
       participantId: "00000000-0000-4000-8000-000000000001",

@@ -13,7 +13,11 @@ import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 import { formatNumber, formatUsd } from "@/lib/format"
 import { getMarket, getMaxLeverage } from "@/lib/markets"
-import { calculateLiquidationPrice, calculateRequiredMargin } from "@/lib/perpetuals"
+import {
+  calculateLiquidationPriceFromMargin,
+  calculateRequiredMargin,
+  computeOpenPositionMargin,
+} from "@/lib/perpetuals"
 import { computeTradeFee } from "@/lib/trading-fees"
 import type { PendingOrder, Position, PositionSide, SupportedSymbol, Trade } from "@/lib/types"
 
@@ -121,19 +125,30 @@ export const OrderEntry = ({
     return computeTradeFee(numericSize, orderType === "LIMIT" ? "MAKER" : "TAKER")
   }, [numericSize, orderType])
 
-  const totalOpenCost = requiredMargin + (orderType === "MARKET" ? estimatedTradeFee : 0)
+  const positionMarginPreview = useMemo(() => {
+    if (requiredMargin <= 0) {
+      return 0
+    }
+
+    if (orderType === "LIMIT") {
+      return requiredMargin - estimatedTradeFee
+    }
+
+    return computeOpenPositionMargin(requiredMargin, estimatedTradeFee)
+  }, [estimatedTradeFee, orderType, requiredMargin])
 
   const liquidationPreview = useMemo(() => {
-    if (!previewEntryPrice || requiredMargin <= 0) {
+    if (!previewEntryPrice || !Number.isFinite(numericSize) || numericSize <= 0 || positionMarginPreview <= 0) {
       return null
     }
 
-    return calculateLiquidationPrice({
+    return calculateLiquidationPriceFromMargin({
       entryPrice: previewEntryPrice,
-      leverage,
+      size: numericSize,
       side,
+      marginAllocated: positionMarginPreview,
     })
-  }, [leverage, previewEntryPrice, requiredMargin, side])
+  }, [numericSize, positionMarginPreview, previewEntryPrice, side])
 
   const currentNetSize = useMemo(() => aggregatePosition(positions, symbol), [positions, symbol])
   const currentSide: PositionSide | null =
@@ -267,7 +282,7 @@ export const OrderEntry = ({
       return
     }
 
-    if (orderType === "MARKET" && availableMargin < totalOpenCost) {
+    if (orderType === "MARKET" && availableMargin < requiredMargin) {
       setInlineError("Insufficient margin.")
       submitInFlightRef.current = false
       setIsSubmitting(false)
@@ -324,13 +339,16 @@ export const OrderEntry = ({
       side,
       leverage,
       size: numericSize,
-      margin_allocated: requiredMargin,
+      margin_allocated: positionMarginPreview,
       entry_price: previewEntryPrice,
-      liquidation_price: calculateLiquidationPrice({
-        entryPrice: previewEntryPrice,
-        leverage,
-        side,
-      }),
+      liquidation_price:
+        liquidationPreview ??
+        calculateLiquidationPriceFromMargin({
+          entryPrice: previewEntryPrice,
+          size: numericSize,
+          side,
+          marginAllocated: positionMarginPreview,
+        }),
       is_open: true,
       last_funding_hour: null,
       created_at: new Date().toISOString(),
@@ -696,14 +714,15 @@ export const OrderEntry = ({
               {requiredMargin > 0 ? formatUsd(requiredMargin) : "N/A"}
             </span>
           </div>
-          {orderType === "MARKET" ? (
-            <div className="flex items-center justify-between border-t border-border/50 pt-2">
-              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Total Cost</span>
-              <span className="font-mono text-text-primary">
-                {totalOpenCost > 0 ? formatUsd(totalOpenCost) : "N/A"}
-              </span>
-            </div>
-          ) : null}
+          <div className="flex items-center justify-between border-t border-border/50 pt-2">
+            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Position Margin</span>
+            <span className="font-mono text-text-primary">
+              {positionMarginPreview > 0 ? formatUsd(positionMarginPreview) : "N/A"}
+            </span>
+          </div>
+          <p className="text-[10px] leading-relaxed text-text-secondary">
+            Isolated margin: the trade fee is taken from position collateral. Available balance is reduced by margin required only.
+          </p>
         </div>
       </CardContent>
     </Card>

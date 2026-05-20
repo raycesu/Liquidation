@@ -13,5 +13,8 @@ describe("run-funding-engine", () => {
     const source = readFileSync(join(__dirname, "run-funding-engine.ts"), "utf8")
     expect(source).toContain("on conflict (position_id, funding_hour) do nothing")
     expect(source).toContain("last_funding_hour")
+    expect(source).toContain("margin_allocated =")
+    expect(source).toContain("actual_applied")
+    expect(source).not.toContain("available_margin = greatest(0, available_margin +")
   })
 })

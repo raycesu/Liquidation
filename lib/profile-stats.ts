@@ -185,8 +185,16 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     }
   }
 
-  const [allRoomParticipants, openPositions, realizedPnlRows, stylePositions, symbolRows, roeRows, lastTradeRows] =
-    (await Promise.all([
+  const [
+    allRoomParticipants,
+    openPositions,
+    realizedPnlRows,
+    fundingPnlRows,
+    stylePositions,
+    symbolRows,
+    roeRows,
+    lastTradeRows,
+  ] = (await Promise.all([
       sql`
         select
           rp.id::text,
@@ -245,6 +253,23 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
       `,
       sql`
         select
+          fp.participant_id::text,
+          coalesce(
+            sum(coalesce(fp.actual_applied, fp.payment_amount)),
+            0
+          )::float8 as funding_pnl
+        from funding_payments fp
+        join room_participants rp on rp.id = fp.participant_id
+        where exists (
+          select 1
+          from room_participants mine
+          where mine.user_id = ${userId}
+            and mine.room_id = rp.room_id
+        )
+        group by fp.participant_id
+      `,
+      sql`
+        select
           p.side,
           p.leverage,
           p.created_at::text,
@@ -298,6 +323,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
       PlainParticipantRow[],
       OpenPositionRow[],
       RealizedPnlRow[],
+      { participant_id: string; funding_pnl: number }[],
       PositionStyleRow[],
       SymbolCountRow[],
       ClosedTradeRoeRow[],
@@ -319,11 +345,18 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
   const openMarginByParticipant = buildOpenMarginByParticipant(openPositions)
   const unrealizedByParticipant = buildUnrealizedPnlByParticipant(openPositions, prices)
 
+  const fundingByParticipant = new Map(fundingPnlRows.map((row) => [row.participant_id, row.funding_pnl]))
   const realizedByParticipant = new Map<string, number>()
   const closedTradeCountByParticipant = new Map<string, number>()
   realizedPnlRows.forEach((row) => {
-    realizedByParticipant.set(row.participant_id, row.realized_pnl)
+    const fundingPnl = fundingByParticipant.get(row.participant_id) ?? 0
+    realizedByParticipant.set(row.participant_id, row.realized_pnl + fundingPnl)
     closedTradeCountByParticipant.set(row.participant_id, parseCount(row.closed_trade_count))
+  })
+  fundingPnlRows.forEach((row) => {
+    if (!realizedByParticipant.has(row.participant_id)) {
+      realizedByParticipant.set(row.participant_id, row.funding_pnl)
+    }
   })
 
   const openByParticipant = new Map<string, boolean>()

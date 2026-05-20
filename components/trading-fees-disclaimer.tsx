@@ -33,8 +33,9 @@ export const TradingFeesDisclaimer = ({ symbol, fundingRate }: TradingFeesDiscla
         </p>
         <p>
           Funding is applied hourly (UTC) using Hyperliquid rates for each market. When the rate is
-          positive, longs pay and shorts receive. At most one funding tick is applied per hour per
-          position (missed hours are not backfilled).
+          positive, longs pay and shorts receive. Funding is deducted from or credited to each
+          position&apos;s isolated margin and can move your liquidation price. At most one funding
+          tick is applied per hour per position (missed hours are not backfilled).
         </p>
         {fundingRate != null ? (
           <p className="font-mono text-text-primary">

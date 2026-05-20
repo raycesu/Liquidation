@@ -98,6 +98,7 @@ export type FundingPayment = {
   symbol: SupportedSymbol
   funding_rate: number
   payment_amount: number
+  actual_applied: number
   funding_hour: string
   created_at: string
 }

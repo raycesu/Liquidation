@@ -88,6 +88,7 @@ create table if not exists public.funding_payments (
   symbol text not null check (char_length(symbol) >= 3 and char_length(symbol) <= 64),
   funding_rate numeric not null,
   payment_amount numeric not null,
+  actual_applied numeric,
   funding_hour timestamptz not null,
   created_at timestamptz not null default now(),
   unique (position_id, funding_hour)

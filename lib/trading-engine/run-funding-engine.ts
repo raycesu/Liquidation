@@ -1,6 +1,7 @@
 import { getSql } from "@/lib/db"
 import { computeFundingPayment, fetchHlFundingRatesByHlName, getFundingHourUtc } from "@/lib/funding"
 import { getMarket } from "@/lib/markets"
+import { buildPositionFundingSettlement } from "@/lib/trading-engine/settle-position-funding"
 import type { Position, PositionSide, SupportedSymbol } from "@/lib/types"
 
 type OpenPositionRow = Position & {
@@ -11,6 +12,7 @@ export type RunFundingEngineResult = {
   applied: number
   skippedMissingRate: number
   skippedAlreadyFunded: number
+  liquidationsPending: number
 }
 
 const toIsoHour = (date: Date) => date.toISOString()
@@ -51,12 +53,13 @@ export const runFundingEngineForRoom = async (roomId: string): Promise<RunFundin
   `) as OpenPositionRow[]
 
   if (openPositions.length === 0) {
-    return { applied: 0, skippedMissingRate: 0, skippedAlreadyFunded: 0 }
+    return { applied: 0, skippedMissingRate: 0, skippedAlreadyFunded: 0, liquidationsPending: 0 }
   }
 
   const ratesByHlName = await fetchHlFundingRatesByHlName()
   let applied = 0
   let skippedMissingRate = 0
+  let liquidationsPending = 0
 
   for (const position of openPositions) {
     const market = getMarket(position.symbol)
@@ -78,20 +81,80 @@ export const runFundingEngineForRoom = async (roomId: string): Promise<RunFundin
     }
 
     const payment = computeFundingPayment(position.side as PositionSide, position.size, hourlyRate)
+    const settlement = buildPositionFundingSettlement({
+      marginAllocated: position.margin_allocated,
+      size: position.size,
+      entryPrice: position.entry_price,
+      side: position.side as PositionSide,
+      payment,
+    })
+
+    if (settlement.skipMarginUpdate) {
+      const inserted = (await sql`
+        with recorded_payment as (
+          insert into funding_payments (
+            participant_id,
+            position_id,
+            symbol,
+            funding_rate,
+            payment_amount,
+            actual_applied,
+            funding_hour
+          )
+          select
+            ${position.participant_id},
+            ${position.id},
+            ${position.symbol as SupportedSymbol},
+            ${hourlyRate},
+            ${payment},
+            ${settlement.actualApplied},
+            ${currentHourIso}::timestamptz
+          where exists (
+            select 1
+            from positions p
+            where p.id = ${position.id}
+              and p.is_open = true
+              and (
+                p.last_funding_hour is null
+                or p.last_funding_hour < ${currentHourIso}::timestamptz
+              )
+          )
+          on conflict (position_id, funding_hour) do nothing
+          returning id::text
+        ),
+        updated_position as (
+          update positions
+          set last_funding_hour = ${currentHourIso}::timestamptz
+          where id = ${position.id}
+            and is_open = true
+            and exists (select 1 from recorded_payment)
+          returning id::text
+        )
+        select id from recorded_payment
+      `) as { id: string }[]
+
+      if (inserted[0]) {
+        applied += 1
+        liquidationsPending += 1
+      }
+
+      continue
+    }
 
     const inserted = (await sql`
-      with updated_margin as (
-        update room_participants rp
-        set available_margin = greatest(0, available_margin + ${payment})
-        from positions p
-        where rp.id = p.participant_id
-          and p.id = ${position.id}
-          and p.is_open = true
+      with updated_position as (
+        update positions
+        set
+          margin_allocated = ${settlement.newMargin},
+          liquidation_price = ${settlement.liquidationPrice},
+          last_funding_hour = ${currentHourIso}::timestamptz
+        where id = ${position.id}
+          and is_open = true
           and (
-            p.last_funding_hour is null
-            or p.last_funding_hour < ${currentHourIso}::timestamptz
+            last_funding_hour is null
+            or last_funding_hour < ${currentHourIso}::timestamptz
           )
-        returning rp.id::text
+        returning id::text
       ),
       recorded_payment as (
         insert into funding_payments (
@@ -100,6 +163,7 @@ export const runFundingEngineForRoom = async (roomId: string): Promise<RunFundin
           symbol,
           funding_rate,
           payment_amount,
+          actual_applied,
           funding_hour
         )
         select
@@ -108,17 +172,10 @@ export const runFundingEngineForRoom = async (roomId: string): Promise<RunFundin
           ${position.symbol as SupportedSymbol},
           ${hourlyRate},
           ${payment},
+          ${settlement.actualApplied},
           ${currentHourIso}::timestamptz
-        where exists (select 1 from updated_margin)
+        where exists (select 1 from updated_position)
         on conflict (position_id, funding_hour) do nothing
-        returning id::text
-      ),
-      updated_position as (
-        update positions
-        set last_funding_hour = ${currentHourIso}::timestamptz
-        where id = ${position.id}
-          and is_open = true
-          and exists (select 1 from recorded_payment)
         returning id::text
       )
       select id from recorded_payment
@@ -126,6 +183,10 @@ export const runFundingEngineForRoom = async (roomId: string): Promise<RunFundin
 
     if (inserted[0]) {
       applied += 1
+
+      if (settlement.shouldLiquidate) {
+        liquidationsPending += 1
+      }
     }
   }
 
@@ -133,6 +194,7 @@ export const runFundingEngineForRoom = async (roomId: string): Promise<RunFundin
     applied,
     skippedMissingRate,
     skippedAlreadyFunded: 0,
+    liquidationsPending,
   }
 }
 
@@ -149,16 +211,19 @@ export const runFundingEngineForActiveRooms = async () => {
 
   let totalApplied = 0
   let totalSkippedMissingRate = 0
+  let totalLiquidationsPending = 0
 
   for (const room of activeRooms) {
     const result = await runFundingEngineForRoom(room.id)
     totalApplied += result.applied
     totalSkippedMissingRate += result.skippedMissingRate
+    totalLiquidationsPending += result.liquidationsPending
   }
 
   return {
     processedRooms: activeRooms.length,
     totalApplied,
     totalSkippedMissingRate,
+    totalLiquidationsPending,
   }
 }

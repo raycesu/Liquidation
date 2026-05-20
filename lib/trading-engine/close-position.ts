@@ -1,4 +1,9 @@
-import { calculatePnl, floorRealizedPnl } from "@/lib/perpetuals"
+import {
+  calculatePnl,
+  computePositionEquity,
+  floorRealizedPnl,
+  getMaintenanceRequirement,
+} from "@/lib/perpetuals"
 import type { PositionSide } from "@/lib/types"
 
 export const getCloseTradeDirection = (side: PositionSide): "CLOSE_LONG" | "CLOSE_SHORT" =>
@@ -43,4 +48,29 @@ export const isPositionUnderwater = (
   }
 
   return livePrice >= position.liquidation_price
+}
+
+export const isPositionLiquidatable = (
+  position: {
+    side: PositionSide
+    liquidation_price: number
+    margin_allocated: number
+    entry_price: number
+    size: number
+  },
+  livePrice: number,
+) => {
+  if (isPositionUnderwater(position, livePrice)) {
+    return true
+  }
+
+  const equity = computePositionEquity({
+    marginAllocated: position.margin_allocated,
+    entryPrice: position.entry_price,
+    livePrice,
+    side: position.side,
+    size: position.size,
+  })
+
+  return equity <= getMaintenanceRequirement(position.size)
 }

@@ -7,7 +7,12 @@ import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition
 import { getSql, withUserContext } from "@/lib/db"
 import { getMaxLeverage, isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrice } from "@/lib/pricing"
-import { calculateLiquidationPrice, calculateRequiredMargin } from "@/lib/perpetuals"
+import {
+  calculateLiquidationPriceFromMargin,
+  calculateRequiredMargin,
+  computeOpenPositionMargin,
+  validatePositionMarginAfterFee,
+} from "@/lib/perpetuals"
 import { getTradeFeeForFill } from "@/lib/trading-fees"
 import { getTriggerSide } from "@/lib/trading-rules"
 import type {
@@ -88,14 +93,19 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
     return { ok: false, error: "Participant not found" }
   }
 
-  const requiredMargin = calculateRequiredMargin(parsed.data.size, parsed.data.leverage)
+  const initialMargin = calculateRequiredMargin(parsed.data.size, parsed.data.leverage)
   const { fee: tradeFee, liquidityRole } = getTradeFeeForFill({
     notionalUsd: parsed.data.size,
     orderType: "MARKET",
   })
-  const totalCost = requiredMargin + tradeFee
+  const positionMargin = computeOpenPositionMargin(initialMargin, tradeFee)
+  const marginValidationError = validatePositionMarginAfterFee(positionMargin, parsed.data.size)
 
-  if (participant.available_margin < totalCost) {
+  if (marginValidationError) {
+    return { ok: false, error: marginValidationError }
+  }
+
+  if (participant.available_margin < initialMargin) {
     return { ok: false, error: "Insufficient margin." }
   }
 
@@ -113,10 +123,11 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
     })
     return { ok: false, error: "Unable to fetch market price. Try again in a moment." }
   }
-  const liquidationPrice = calculateLiquidationPrice({
+  const liquidationPrice = calculateLiquidationPriceFromMargin({
     entryPrice,
-    leverage: parsed.data.leverage,
+    size: parsed.data.size,
     side,
+    marginAllocated: positionMargin,
   })
 
   if (parsed.data.takeProfitPrice != null) {
@@ -143,9 +154,9 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
   const sql = getSql()
   const marginRows = (await sql`
     update room_participants
-    set available_margin = available_margin - ${totalCost}
+    set available_margin = available_margin - ${initialMargin}
     where id = ${participant.id}
-      and available_margin >= ${totalCost}
+      and available_margin >= ${initialMargin}
     returning available_margin::float8 as available_margin
   `) as Pick<RoomParticipant, "available_margin">[]
   const marginRow = marginRows[0]
@@ -172,7 +183,7 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
       ${side},
       ${parsed.data.leverage},
       ${parsed.data.size},
-      ${requiredMargin},
+      ${positionMargin},
       ${entryPrice},
       ${liquidationPrice},
       true
@@ -196,7 +207,7 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
   if (!position) {
     await sql`
       update room_participants
-      set available_margin = available_margin + ${totalCost}
+      set available_margin = available_margin + ${initialMargin}
       where id = ${participant.id}
     `
     return { ok: false, error: "Unable to place order" }
