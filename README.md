@@ -14,10 +14,13 @@ Signed-out visitors see a **marketing landing page** at `/`. Signed-in users wit
 
 ### Competitions and social layer
 
-- **Dashboard** — Room cards with rounded equity/margin figures, competition status, and quick actions to create or join a room.
-- **Rooms** — Create competitions with name, optional **description**, schedule, starting balance, and active state. Each room gets a unique **six-character join code** (e.g. `A1B2C3`) shown in the lobby.
-- **Join flow** — Enter a join code from the dashboard **Join room** dialog (rate-limited per user). The lobby displays the code for participants to share. Legacy `/join/[room_id]` redirects to the dashboard.
-- **Room lobby** — Competition metadata, join code, description, status (upcoming / active / ended / settled), and a paginated **PnL leaderboard** (rank, trader, PnL, win rate, trades, free margin). Leaderboard metrics use the same PnL logic as profile competition history.
+- **Dashboard** — Room cards with rounded equity/margin figures, competition status, and quick actions to create or join a room. **Public** competitions you have not joined appear in a discover section with a one-click **Join room** action.
+- **Public vs private rooms** — When creating a room, choose **Private** (hidden from browse; unique **six-character join code**, e.g. `A1B2C3`, shown in the lobby) or **Public** (listed on every trader’s dashboard; no join code). Enforced in Postgres via `is_public` and `rooms_visibility_join_code_check` (`lib/room-visibility.ts`).
+- **Late join window** — Optional **`late_join_hours`** on create: leave blank to allow joins until the competition ends; **`0`** to require joining before start; or a positive number (e.g. `48`) to allow late joins for that many hours after start. Enforced in app guards (`lib/room-join-policy.ts`, `lib/competition-guards.ts`) and RLS on `room_participants` inserts.
+- **Rooms** — Create competitions with name, optional **description**, schedule, starting balance, visibility, late-join policy, and active state.
+- **Join flow** — **Private:** enter a join code from the dashboard **Join room** dialog (rate-limited per user). **Public:** join from the dashboard discover card or lobby. Legacy `/join/[room_id]` redirects to the dashboard.
+- **Room lobby** — Competition metadata, visibility badge, join code (private only), late-join policy, description, status (upcoming / active / ended / settled), and a paginated **PnL leaderboard** (rank, trader, PnL, win rate, trades, free margin). Leaderboard metrics use the same PnL logic as profile competition history.
+- **Host participant management** — Room creators can **remove participants** from the lobby (cannot remove themselves; target must have **no open positions**). `components/room/room-participant-management.tsx`, `removeRoomParticipant` in `actions/rooms.ts`.
 - **End-of-competition settlement** — When `end_date` passes or a room is deactivated, the background engine **cancels all pending orders**, **closes open positions** at live marks, and sets **`settled_at`**. Trading and new joins are blocked after settlement (`lib/competition-guards.ts`, `lib/trading-engine/settle-room.ts`).
 
 ### Trading terminal
@@ -32,7 +35,7 @@ Signed-out visitors see a **marketing landing page** at `/`. Signed-in users wit
 - **Open orders** — Pending limits and triggers (grouped when linked to a position or parent limit), cancel support, paginated **10 rows per page**.
 - **Trade history** — Fills, fees, and realized PnL for the current room participant, paginated like positions and open orders.
 - **Trading fees** — Maker **0.02%** on limit fills; taker **0.05%** on market opens and closes (TP/SL, manual close). No trading fee on liquidation.
-- **Funding** — Hourly Hyperliquid-sourced funding applied by the background engine (longs pay / shorts receive when the HL rate is positive).
+- **Funding (pure isolated margin)** — Hourly Hyperliquid-sourced funding is applied to each position’s **`margin_allocated`** (not wallet balance), which updates **liquidation price** and effective PnL. Longs pay / shorts receive when the HL rate is positive. Payments record **`actual_applied`** when margin cannot absorb the full debit. Positions at or below maintenance after funding are flagged for liquidation on the next engine pass (`lib/perpetuals.ts`, `lib/trading-engine/settle-position-funding.ts`, `run-funding-engine.ts`).
 - **Order watcher** — Server-side checks for pending limits and triggers as prices move (`lib/trading-rules.ts`); **liquidation** uses live marks when positions cross liquidation price.
 
 ### Profile and account
@@ -177,6 +180,9 @@ npm run test:watch
 | `009_add_order_parent_order_id.sql` | `parent_order_id` on orders for bracket TP/SL linked to limits |
 | `010_trading_fees_and_funding.sql` | Trade `fee` / `liquidity_role`, `funding_payments`, position `last_funding_hour` |
 | `011_add_room_settled_at.sql` | `settled_at` on rooms and index for unsettled due rooms |
+| `012_isolated_margin.sql` | `funding_payments.actual_applied`; recompute open-position liquidation prices from isolated margin |
+| `013_late_join_hours.sql` | `late_join_hours` on rooms; RLS join cutoff aligned with app policy |
+| `014_room_visibility.sql` | `is_public` on rooms; nullable join code for public rooms; discover RLS; creator can delete participants |
 
 Apply with your Neon workflow, `psql`, or any SQL client. Order matters: schema first, then migrations in filename order.
 
@@ -207,9 +213,14 @@ Commit the updated generated file when you intentionally change the tradable uni
 | `lib/trading-engine/run-trading-engine.ts` | Cron orchestration (settlement, then ongoing rooms) |
 | `lib/trading-engine/settle-room.ts` | End competition: cancel orders, close positions, `settled_at` |
 | `lib/trading-engine/run-order-engine.ts` | Limit/trigger fills and bracket handling |
-| `lib/trading-engine/run-funding-engine.ts` | Hourly HL funding debits/credits |
+| `lib/trading-engine/run-funding-engine.ts` | Hourly HL funding on isolated position margin |
+| `lib/trading-engine/settle-position-funding.ts` | Per-position funding settlement and liquidation reprice |
 | `lib/trading-engine/liquidate.ts` | Mark-based liquidation |
-| `lib/competition-guards.ts` | Block trading/join when competition ended or settled |
+| `lib/competition-guards.ts` | Block trading/join when competition ended, settled, or past late-join cutoff |
+| `lib/room-join-policy.ts` | Late-join cutoff and join-window helpers |
+| `lib/room-visibility.ts` | Public vs private room labels |
+| `components/join-public-room-button.tsx` | One-click join for discoverable public rooms |
+| `components/room/room-participant-management.tsx` | Host UI to remove participants |
 | `lib/rate-limit.ts` | In-memory limits for engine cron and join-room |
 | `hooks/useTradingEngineSync.ts` | Terminal polling (3s) while trade UI is open |
 | `hooks/use-client-pagination.ts` | Shared pagination for terminal tables |
