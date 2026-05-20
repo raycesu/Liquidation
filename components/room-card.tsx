@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { JoinPublicRoomButton } from "@/components/join-public-room-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils"
 
 type RoomCardProps = {
   room: Room
+  variant?: "member" | "discover"
 }
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
@@ -34,9 +36,10 @@ const phaseCopy: Record<
   },
 }
 
-export const RoomCard = ({ room }: RoomCardProps) => {
+export const RoomCard = ({ room, variant = "member" }: RoomCardProps) => {
   const phase = getCompetitionPhase(room)
   const { label, badgeClass } = phaseCopy[phase]
+  const description = room.description?.trim()
 
   return (
     <Card className="border-border/80 bg-card/80 shadow-lg shadow-black/10 ring-1 ring-border/40 backdrop-blur-sm transition-shadow hover:shadow-xl hover:ring-border/60">
@@ -45,10 +48,20 @@ export const RoomCard = ({ room }: RoomCardProps) => {
           <CardTitle className="text-lg font-semibold leading-snug tracking-tight text-text-primary">
             {room.name}
           </CardTitle>
-          <Badge variant="outline" className={cn("shrink-0 font-medium", badgeClass)}>
-            {label}
-          </Badge>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            {variant === "discover" ? (
+              <Badge variant="outline" className="border-accent-neon/35 bg-accent-neon/10 font-medium text-accent-neon">
+                Public
+              </Badge>
+            ) : null}
+            <Badge variant="outline" className={cn("font-medium", badgeClass)}>
+              {label}
+            </Badge>
+          </div>
         </div>
+        {variant === "discover" && description ? (
+          <p className="text-sm leading-relaxed text-muted-foreground line-clamp-2">{description}</p>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -63,11 +76,17 @@ export const RoomCard = ({ room }: RoomCardProps) => {
         </dl>
         <div className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Starting capital</p>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">{formatWholeUsd(room.starting_balance)}</p>
+          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">
+            {formatWholeUsd(room.starting_balance)}
+          </p>
         </div>
-        <Button asChild className="w-full font-medium shadow-sm shadow-primary/15" size="lg">
-          <Link href={`/room/${room.id}`}>Open lobby</Link>
-        </Button>
+        {variant === "discover" ? (
+          <JoinPublicRoomButton roomId={room.id} />
+        ) : (
+          <Button asChild className="w-full font-medium shadow-sm shadow-primary/15" size="lg">
+            <Link href={`/room/${room.id}`}>Open lobby</Link>
+          </Button>
+        )}
       </CardContent>
     </Card>
   )

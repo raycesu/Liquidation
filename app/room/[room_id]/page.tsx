@@ -6,11 +6,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { PnlLeaderboardSection } from "@/components/room/pnl-leaderboard-section"
+import { RoomParticipantManagement } from "@/components/room/room-participant-management"
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { formatWholeUsd } from "@/lib/format"
 import { getRoomLeaderboard } from "@/lib/room-leaderboard"
 import { formatLateJoinPolicy } from "@/lib/room-join-policy"
+import { getRoomVisibilityLabel, isPrivateRoom } from "@/lib/room-visibility"
 import type { Room, RoomParticipant } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -122,6 +124,7 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
       creator_id,
       name,
       description,
+      is_public,
       join_code,
       starting_balance::float8 as starting_balance,
       start_date::text,
@@ -159,6 +162,21 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
   }
 
   const { rankedParticipants, leaderboardPage } = await getRoomLeaderboard(room.id, search?.page)
+  const isCreator = user.id === room.creator_id
+
+  const memberRows = isCreator
+    ? ((await sql`
+        select
+          rp.id::text as participant_id,
+          rp.user_id,
+          u.username,
+          rp.created_at::text as joined_at
+        from room_participants rp
+        join users u on u.id = rp.user_id
+        where rp.room_id = ${room.id}
+        order by rp.created_at asc
+      `) as { participant_id: string; user_id: string; username: string; joined_at: string }[])
+    : []
 
   const status = getRoomStatus(room)
   const roomDescription = room.description?.trim()
@@ -170,9 +188,17 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
       value: formatWholeUsd(room.starting_balance),
     },
     {
-      label: "Room code",
-      value: room.join_code,
+      label: "Visibility",
+      value: getRoomVisibilityLabel(room),
     },
+    ...(isPrivateRoom(room) && room.join_code
+      ? [
+          {
+            label: "Room code",
+            value: room.join_code,
+          },
+        ]
+      : []),
     {
       label: "Start date",
       value: (
@@ -207,6 +233,12 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
               <div className="flex flex-wrap items-center gap-3">
                 <Badge variant="outline" className={getStatusClassName(status)}>
                   {getStatusLabel(status)}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="border-border/60 bg-background/35 text-text-secondary hover:bg-background/35"
+                >
+                  {getRoomVisibilityLabel(room)}
                 </Badge>
                 <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/35 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-text-secondary">
                   <Trophy className="size-3.5 text-accent-neon" aria-hidden />
@@ -256,6 +288,19 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
             <DetailCard key={detail.label} {...detail} />
           ))}
         </section>
+
+        {isCreator ? (
+          <RoomParticipantManagement
+            roomId={room.id}
+            members={memberRows.map((row) => ({
+              participantId: row.participant_id,
+              userId: row.user_id,
+              username: row.username,
+              joinedAt: row.joined_at,
+              isCreator: row.user_id === room.creator_id,
+            }))}
+          />
+        ) : null}
 
         <PnlLeaderboardSection
           leaderboardPage={leaderboardPage}

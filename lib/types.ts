@@ -17,7 +17,8 @@ export type Room = {
   creator_id: string
   name: string
   description: string | null
-  join_code: string
+  is_public: boolean
+  join_code: string | null
   starting_balance: number
   start_date: string
   end_date: string

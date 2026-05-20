@@ -14,7 +14,11 @@ create table if not exists public.rooms (
   creator_id text not null references public.users(id) on delete cascade,
   name text not null,
   description text,
-  join_code text not null check (join_code ~ '^[A-Z0-9]{6}$'),
+  is_public boolean not null default false,
+  join_code text check (
+    (is_public = true and join_code is null)
+    or (is_public = false and join_code ~ '^[A-Z0-9]{6}$')
+  ),
   starting_balance numeric not null default 10000 check (starting_balance > 0),
   start_date timestamptz not null default now(),
   end_date timestamptz not null,
@@ -96,7 +100,7 @@ create table if not exists public.funding_payments (
 );
 
 create index if not exists rooms_creator_id_idx on public.rooms (creator_id);
-create unique index if not exists rooms_join_code_unique_idx on public.rooms (join_code);
+create unique index if not exists rooms_join_code_unique_idx on public.rooms (join_code) where join_code is not null;
 create unique index if not exists users_username_lower_unique_idx on public.users (lower(username));
 create index if not exists room_participants_user_id_idx on public.room_participants (user_id);
 create index if not exists room_participants_room_id_idx on public.room_participants (room_id);
@@ -155,11 +159,13 @@ using (id = public.current_app_user_id())
 with check (id = public.current_app_user_id());
 
 drop policy if exists rooms_select_member_or_creator on public.rooms;
-create policy rooms_select_member_or_creator
+drop policy if exists rooms_select_member_or_creator_or_public on public.rooms;
+create policy rooms_select_member_or_creator_or_public
 on public.rooms
 for select
 using (
   creator_id = public.current_app_user_id()
+  or is_public = true
   or exists (
     select 1
     from public.room_participants rp
@@ -220,6 +226,20 @@ on public.room_participants
 for update
 using (user_id = public.current_app_user_id())
 with check (user_id = public.current_app_user_id());
+
+drop policy if exists room_participants_delete_creator on public.room_participants;
+create policy room_participants_delete_creator
+on public.room_participants
+for delete
+using (
+  exists (
+    select 1
+    from public.rooms r
+    where r.id = room_participants.room_id
+      and r.creator_id = public.current_app_user_id()
+  )
+  and room_participants.user_id <> public.current_app_user_id()
+);
 
 drop policy if exists positions_select_room_members on public.positions;
 create policy positions_select_room_members

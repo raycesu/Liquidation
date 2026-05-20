@@ -28,6 +28,7 @@ export default async function TradePage({ params }: TradePageProps) {
       creator_id,
       name,
       description,
+      is_public,
       join_code,
       starting_balance::float8 as starting_balance,
       start_date::text as start_date,

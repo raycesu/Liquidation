@@ -12,6 +12,7 @@ const baseRoom: Room = {
   creator_id: "creator",
   name: "Test Room",
   description: null,
+  is_public: false,
   join_code: "ABC123",
   starting_balance: 10_000,
   start_date: "2026-05-01T00:00:00.000Z",

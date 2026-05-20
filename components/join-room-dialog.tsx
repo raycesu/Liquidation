@@ -65,7 +65,8 @@ export const JoinRoomDialog = (props?: JoinRoomDialogProps) => {
             </div>
             <DialogTitle className="text-lg font-semibold tracking-tight">Join competition room</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-              Paste the six-character code from the host. Codes are not case-sensitive.
+              Enter the six-character code for a private room. Public rooms can be joined from the dashboard list.
+              Codes are not case-sensitive.
             </DialogDescription>
           </DialogHeader>
         </div>

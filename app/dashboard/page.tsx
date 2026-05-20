@@ -4,7 +4,8 @@ import { DashboardHeader } from "@/components/dashboard-header"
 import { JoinRoomDialog } from "@/components/join-room-dialog"
 import { RoomCard } from "@/components/room-card"
 import { requireOnboardedUser } from "@/lib/auth"
-import { getSql } from "@/lib/db"
+import { assertRoomJoinable } from "@/lib/competition-guards"
+import { getSql, withUserContext } from "@/lib/db"
 import type { Room } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -14,6 +15,22 @@ type DashboardParticipant = {
   rooms: Room | null
 }
 
+const mapRoomRow = (row: Record<string, unknown>): Room => ({
+  id: String(row.id),
+  creator_id: String(row.creator_id),
+  name: String(row.name),
+  description: row.description ? String(row.description) : null,
+  is_public: Boolean(row.is_public),
+  join_code: row.join_code ? String(row.join_code) : null,
+  starting_balance: Number(row.starting_balance),
+  start_date: String(row.start_date),
+  end_date: String(row.end_date),
+  is_active: Boolean(row.is_active),
+  settled_at: row.settled_at ? String(row.settled_at) : null,
+  late_join_hours: row.late_join_hours === null || row.late_join_hours === undefined ? null : Number(row.late_join_hours),
+  created_at: String(row.created_at),
+})
+
 export default async function DashboardPage() {
   const user = await requireOnboardedUser()
 
@@ -21,57 +38,125 @@ export default async function DashboardPage() {
     redirect("/sign-in")
   }
 
-  const sql = getSql()
-  const participants = (await sql`
-    select
-      rp.id::text,
-      json_build_object(
-        'id', r.id::text,
-        'creator_id', r.creator_id,
-        'name', r.name,
-        'description', r.description,
-        'join_code', r.join_code,
-        'starting_balance', r.starting_balance::float8,
-        'start_date', r.start_date::text,
-        'end_date', r.end_date::text,
-        'is_active', r.is_active,
-        'settled_at', r.settled_at::text,
-        'late_join_hours', r.late_join_hours,
-        'created_at', r.created_at::text
-      ) as rooms
-    from room_participants rp
-    join rooms r on r.id = rp.room_id
-    where rp.user_id = ${user.id}
-    order by r.created_at desc
-  `) as DashboardParticipant[]
+  const { joinedRooms, discoverablePublicRooms } = await withUserContext(user.id, async () => {
+    const sql = getSql()
 
-  const rooms = participants.filter((participant) => participant.rooms)
+    const participants = (await sql`
+      select
+        rp.id::text,
+        json_build_object(
+          'id', r.id::text,
+          'creator_id', r.creator_id,
+          'name', r.name,
+          'description', r.description,
+          'is_public', r.is_public,
+          'join_code', r.join_code,
+          'starting_balance', r.starting_balance::float8,
+          'start_date', r.start_date::text,
+          'end_date', r.end_date::text,
+          'is_active', r.is_active,
+          'settled_at', r.settled_at::text,
+          'late_join_hours', r.late_join_hours,
+          'created_at', r.created_at::text
+        ) as rooms
+      from room_participants rp
+      join rooms r on r.id = rp.room_id
+      where rp.user_id = ${user.id}
+      order by r.created_at desc
+    `) as DashboardParticipant[]
+
+    const publicRoomRows = (await sql`
+      select
+        id::text,
+        creator_id,
+        name,
+        description,
+        is_public,
+        join_code,
+        starting_balance::float8 as starting_balance,
+        start_date::text,
+        end_date::text,
+        is_active,
+        settled_at::text,
+        late_join_hours,
+        created_at::text
+      from rooms r
+      where r.is_public = true
+        and not exists (
+          select 1
+          from room_participants rp
+          where rp.room_id = r.id
+            and rp.user_id = ${user.id}
+        )
+      order by r.created_at desc
+    `) as Record<string, unknown>[]
+
+    const joined = participants
+      .map((participant) => participant.rooms)
+      .filter((room): room is Room => room !== null)
+
+    const discoverable = publicRoomRows
+      .map(mapRoomRow)
+      .filter((room) => assertRoomJoinable(room).ok)
+
+    return {
+      joinedRooms: joined,
+      discoverablePublicRooms: discoverable,
+    }
+  })
+
+  const hasJoinedRooms = joinedRooms.length > 0
+  const hasDiscoverableRooms = discoverablePublicRooms.length > 0
+  const isEmpty = !hasJoinedRooms && !hasDiscoverableRooms
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-10">
         <DashboardHeader username={user.username} imageUrl={user.image_url} />
 
-        <section className="space-y-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Competition Rooms</h1>
-
-          {rooms.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {rooms.map((participant) =>
-                participant.rooms ? <RoomCard key={participant.id} room={participant.rooms} /> : null,
-              )}
+        {hasDiscoverableRooms ? (
+          <section className="space-y-6">
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">
+                Open public competitions
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Join a public room from the list below. Private rooms still require a code from the host.
+              </p>
             </div>
-          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {discoverablePublicRooms.map((room) => (
+                <RoomCard key={room.id} room={room} variant="discover" />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="space-y-6">
+          <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Your competitions</h1>
+
+          {hasJoinedRooms ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {joinedRooms.map((room) => (
+                <RoomCard key={room.id} room={room} variant="member" />
+              ))}
+            </div>
+          ) : isEmpty ? (
             <div className="rounded-2xl border border-dashed border-border/80 bg-card/40 p-10 text-center shadow-inner shadow-black/5 backdrop-blur-sm sm:p-14">
               <h2 className="text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">No rooms yet</h2>
               <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
-                Start a competition room or enter a shared room code to begin paper trading.
+                Start a competition room, browse public competitions above when available, or enter a private room
+                code.
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <JoinRoomDialog />
                 <CreateRoomDialog />
               </div>
             </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              You have not joined any competitions yet. Browse public rooms above or enter a private code.
+            </p>
           )}
         </section>
       </div>

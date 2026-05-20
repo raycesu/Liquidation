@@ -272,12 +272,14 @@ const loadRoomForSettlement = async (roomId: string) => {
       creator_id,
       name,
       description,
+      is_public,
       join_code,
       starting_balance::float8 as starting_balance,
       start_date::text,
       end_date::text,
       is_active,
       settled_at::text,
+      late_join_hours,
       created_at::text
     from rooms
     where id = ${roomId}
