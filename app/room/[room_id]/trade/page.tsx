@@ -34,6 +34,7 @@ export default async function TradePage({ params }: TradePageProps) {
       end_date::text as end_date,
       is_active,
       settled_at::text as settled_at,
+      late_join_hours,
       created_at::text as created_at
     from rooms
     where id = ${roomId}

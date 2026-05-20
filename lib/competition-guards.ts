@@ -1,9 +1,11 @@
 import { getCompetitionPhase, isRoomSettled } from "@/lib/room-competition-status"
+import { isRoomJoinOpen } from "@/lib/room-join-policy"
 import { getSql, withUserContext } from "@/lib/db"
 import type { ActionResult, Room, RoomParticipant } from "@/lib/types"
 
 export const TRADING_CLOSED_MESSAGE = "Trading is only available while the competition is ongoing"
 export const COMPETITION_ENDED_MESSAGE = "This competition has ended"
+export const JOIN_WINDOW_CLOSED_MESSAGE = "This room is no longer accepting new participants"
 
 export const assertRoomTradingOpen = (room: Room, now: Date = new Date()): ActionResult<void> => {
   if (isRoomSettled(room)) {
@@ -20,6 +22,10 @@ export const assertRoomTradingOpen = (room: Room, now: Date = new Date()): Actio
 export const assertRoomJoinable = (room: Room, now: Date = new Date()): ActionResult<void> => {
   if (isRoomSettled(room) || getCompetitionPhase(room, now) === "ended") {
     return { ok: false, error: COMPETITION_ENDED_MESSAGE }
+  }
+
+  if (!isRoomJoinOpen(room, now)) {
+    return { ok: false, error: JOIN_WINDOW_CLOSED_MESSAGE }
   }
 
   return { ok: true, data: undefined }
@@ -54,6 +60,7 @@ export const loadRoomForParticipant = async (
         'end_date', r.end_date::text,
         'is_active', r.is_active,
         'settled_at', r.settled_at::text,
+        'late_join_hours', r.late_join_hours,
         'created_at', r.created_at::text
       ) as room
     from room_participants rp

@@ -20,6 +20,7 @@ create table if not exists public.rooms (
   end_date timestamptz not null,
   is_active boolean not null default true,
   settled_at timestamptz,
+  late_join_hours integer check (late_join_hours is null or late_join_hours >= 0),
   created_at timestamptz not null default now()
 );
 
@@ -204,6 +205,12 @@ with check (
     from public.rooms r
     where r.id = room_participants.room_id
       and r.is_active = true
+      and r.settled_at is null
+      and now() < r.end_date
+      and (
+        r.late_join_hours is null
+        or now() < r.start_date + (r.late_join_hours * interval '1 hour')
+      )
   )
 );
 

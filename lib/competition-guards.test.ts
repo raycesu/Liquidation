@@ -2,6 +2,7 @@ import {
   assertRoomJoinable,
   assertRoomTradingOpen,
   COMPETITION_ENDED_MESSAGE,
+  JOIN_WINDOW_CLOSED_MESSAGE,
   TRADING_CLOSED_MESSAGE,
 } from "@/lib/competition-guards"
 import type { Room } from "@/lib/types"
@@ -17,6 +18,7 @@ const baseRoom: Room = {
   end_date: "2026-05-31T23:59:59.000Z",
   is_active: true,
   settled_at: null,
+  late_join_hours: null,
   created_at: "2026-04-01T00:00:00.000Z",
 }
 
@@ -64,5 +66,21 @@ describe("assertRoomJoinable", () => {
   it("blocks join after competition ends", () => {
     const now = new Date("2026-06-01T12:00:00.000Z")
     expect(assertRoomJoinable(baseRoom, now)).toEqual({ ok: false, error: COMPETITION_ENDED_MESSAGE })
+  })
+
+  it("blocks join after start when late_join_hours is 0", () => {
+    const now = new Date("2026-05-15T12:00:00.000Z")
+    expect(assertRoomJoinable({ ...baseRoom, late_join_hours: 0 }, now)).toEqual({
+      ok: false,
+      error: JOIN_WINDOW_CLOSED_MESSAGE,
+    })
+  })
+
+  it("blocks join after late window expires", () => {
+    const now = new Date("2026-05-04T00:00:00.000Z")
+    expect(assertRoomJoinable({ ...baseRoom, late_join_hours: 48 }, now)).toEqual({
+      ok: false,
+      error: JOIN_WINDOW_CLOSED_MESSAGE,
+    })
   })
 })

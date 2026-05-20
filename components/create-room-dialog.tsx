@@ -109,6 +109,24 @@ export const CreateRoomDialog = (props?: CreateRoomDialogProps) => {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="lateJoinHours">Late join window (hours after start)</Label>
+            <Input
+              id="lateJoinHours"
+              name="lateJoinHours"
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              placeholder="Optional"
+              aria-describedby="lateJoinHoursHelp"
+            />
+            <p id="lateJoinHoursHelp" className="text-xs leading-relaxed text-muted-foreground">
+              Leave blank to allow joins until the competition ends. Use 0 to require joining before start, or enter
+              hours (e.g. 48) to allow late joins for that long after start.
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"

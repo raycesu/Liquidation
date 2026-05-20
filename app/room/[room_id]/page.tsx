@@ -10,6 +10,7 @@ import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
 import { formatWholeUsd } from "@/lib/format"
 import { getRoomLeaderboard } from "@/lib/room-leaderboard"
+import { formatLateJoinPolicy } from "@/lib/room-join-policy"
 import type { Room, RoomParticipant } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -127,6 +128,7 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
       end_date::text,
       is_active,
       settled_at::text,
+      late_join_hours,
       created_at::text
     from rooms
     where id = ${roomId}
@@ -188,6 +190,10 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
           <span className="text-base font-medium tracking-normal text-text-secondary">{endDate.time}</span>
         </span>
       ),
+    },
+    {
+      label: "Join policy",
+      value: formatLateJoinPolicy(room),
     },
   ]
 

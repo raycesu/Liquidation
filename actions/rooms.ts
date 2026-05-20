@@ -16,11 +16,31 @@ const normalizeRoomDescription = (description: string) => description.trim().rep
 
 const getDescriptionWordCount = (description: string) => description.split(/\s+/).filter(Boolean).length
 
+const lateJoinHoursSchema = z.preprocess(
+  (value) => {
+    const raw = String(value ?? "").trim()
+
+    if (raw.length === 0) {
+      return null
+    }
+
+    return raw
+  },
+  z.union([
+    z.null(),
+    z.coerce
+      .number()
+      .int("Late join hours must be a whole number")
+      .nonnegative("Late join hours cannot be negative"),
+  ]),
+)
+
 const createRoomSchema = z.object({
   name: z.string().min(3, "Room name must be at least 3 characters").max(80),
   startingBalance: z.coerce.number().positive("Starting balance must be positive").default(10000),
   startDate: z.string().min(1, "Choose a start date"),
   endDate: z.string().min(1, "Choose an end date"),
+  lateJoinHours: lateJoinHoursSchema,
   description: z
     .string()
     .transform((value) => {
@@ -67,6 +87,7 @@ export const createRoom = async (
     startingBalance: formData.get("startingBalance"),
     startDate: String(formData.get("startDate") ?? ""),
     endDate: String(formData.get("endDate") ?? ""),
+    lateJoinHours: formData.get("lateJoinHours"),
     description: String(formData.get("description") ?? ""),
   })
 
@@ -89,6 +110,18 @@ export const createRoom = async (
     return { ok: false, error: "End date must be in the future" }
   }
 
+  if (parsed.data.lateJoinHours !== null) {
+    const competitionMs = endDate.getTime() - startDate.getTime()
+    const lateJoinMs = parsed.data.lateJoinHours * 60 * 60 * 1000
+
+    if (lateJoinMs > competitionMs) {
+      return {
+        ok: false,
+        error: "Late join window cannot be longer than the competition duration",
+      }
+    }
+  }
+
   const user = await requireOnboardedUser()
 
   if (!user) {
@@ -103,7 +136,17 @@ export const createRoom = async (
       try {
         const joinCode = generateJoinCode()
         const rooms = (await sql`
-          insert into rooms (creator_id, name, description, join_code, starting_balance, start_date, end_date, is_active)
+          insert into rooms (
+            creator_id,
+            name,
+            description,
+            join_code,
+            starting_balance,
+            start_date,
+            end_date,
+            is_active,
+            late_join_hours
+          )
           values (
             ${user.id},
             ${parsed.data.name},
@@ -112,7 +155,8 @@ export const createRoom = async (
             ${parsed.data.startingBalance},
             ${startDate.toISOString()},
             ${endDate.toISOString()},
-            true
+            true,
+            ${parsed.data.lateJoinHours}
           )
           returning
             id::text,
@@ -125,6 +169,7 @@ export const createRoom = async (
             end_date::text,
             is_active,
             settled_at::text,
+            late_join_hours,
             created_at::text
         `) as Room[]
         room = rooms[0] ?? null
@@ -200,6 +245,7 @@ export const joinRoom = async (joinCode: string): Promise<ActionResult<JoinRoomD
         end_date::text as end_date,
         is_active,
         settled_at::text as settled_at,
+        late_join_hours,
         created_at::text as created_at
       from rooms
       where join_code = ${parsedJoinCode.data}

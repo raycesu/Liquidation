@@ -16,6 +16,7 @@ const baseRoom: Room = {
   end_date: "2026-05-31T23:59:59.000Z",
   is_active: true,
   settled_at: null,
+  late_join_hours: null,
   created_at: "2026-04-01T00:00:00.000Z",
 }
 
