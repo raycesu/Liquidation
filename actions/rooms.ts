@@ -9,13 +9,12 @@ import { getSql, withUserContext } from "@/lib/db"
 import { isPublicRoom } from "@/lib/room-visibility"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { isUniqueViolation } from "@/lib/username"
+import {
+  getDescriptionWordCount,
+  MAX_ROOM_DESCRIPTION_WORDS,
+  normalizeRoomDescription,
+} from "@/lib/room-description"
 import type { ActionResult, Room } from "@/lib/types"
-
-const MAX_ROOM_DESCRIPTION_WORDS = 25
-
-const normalizeRoomDescription = (description: string) => description.trim().replace(/\s+/g, " ")
-
-const getDescriptionWordCount = (description: string) => description.split(/\s+/).filter(Boolean).length
 
 const lateJoinHoursSchema = z.preprocess(
   (value) => {
