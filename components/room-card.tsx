@@ -1,8 +1,10 @@
 import Link from "next/link"
+import { ArrowRight } from "lucide-react"
 import { JoinPublicRoomButton } from "@/components/join-public-room-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { openLobbyButtonClassName } from "@/lib/dashboard-nav-triggers"
 import { formatWholeUsd } from "@/lib/format"
 import { getCompetitionPhase } from "@/lib/room-competition-status"
 import type { Room } from "@/lib/types"
@@ -27,23 +29,53 @@ const phaseCopy: Record<
     badgeClass: "border-border/80 bg-muted/50 text-muted-foreground hover:bg-muted/50",
   },
   ongoing: {
-    label: "Ongoing",
-    badgeClass: "border-profit/30 bg-profit/10 text-profit hover:bg-profit/10",
+    label: "Live",
+    badgeClass:
+      "rounded-full border-profit/35 bg-profit/15 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-profit hover:bg-profit/15",
   },
   ended: {
     label: "Ended",
-    badgeClass: "border-loss/30 bg-loss/10 text-loss hover:bg-loss/10",
+    badgeClass:
+      "rounded-full border-border/60 bg-muted/30 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/30",
   },
 }
+
+const dateLabelsByPhase: Record<
+  ReturnType<typeof getCompetitionPhase>,
+  { start: string; end: string }
+> = {
+  upcoming: { start: "Starts", end: "Ends" },
+  ongoing: { start: "Starts", end: "Ends" },
+  ended: { start: "Started", end: "Ended" },
+}
+
+const mutedResultsButtonClassName =
+  "h-11 w-full rounded-lg border border-border/60 bg-muted/20 font-medium text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted/30 hover:text-foreground"
 
 export const RoomCard = ({ room, variant = "member" }: RoomCardProps) => {
   const phase = getCompetitionPhase(room)
   const { label, badgeClass } = phaseCopy[phase]
+  const { start: startLabel, end: endLabel } = dateLabelsByPhase[phase]
   const description = room.description?.trim()
+  const isLiveMemberCard = variant === "member" && phase === "ongoing"
+  const isEndedMemberCard = variant === "member" && phase === "ended"
 
   return (
-    <Card className="border-border/80 bg-card/80 shadow-lg shadow-black/10 ring-1 ring-border/40 backdrop-blur-sm transition-shadow hover:shadow-xl hover:ring-border/60">
-      <CardHeader className="space-y-3 pb-2">
+    <Card
+      className={cn(
+        "relative overflow-hidden border-border/80 bg-card/80 shadow-lg shadow-black/10 ring-1 ring-border/40 backdrop-blur-sm transition-shadow hover:shadow-xl",
+        isLiveMemberCard
+          ? "border-accent-neon/25 ring-accent-neon/20 hover:ring-accent-neon/35"
+          : "hover:ring-border/60",
+      )}
+    >
+      {isLiveMemberCard ? (
+        <div
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(circle_at_0%_0%,rgb(16_199_255/0.14),transparent_42%),radial-gradient(circle_at_100%_0%,rgb(16_199_255/0.14),transparent_42%)]"
+          aria-hidden
+        />
+      ) : null}
+      <CardHeader className="relative space-y-3 pb-2">
         <div className="flex items-start justify-between gap-3">
           <CardTitle className="text-lg font-semibold leading-snug tracking-tight text-text-primary">
             {room.name}
@@ -63,28 +95,35 @@ export const RoomCard = ({ room, variant = "member" }: RoomCardProps) => {
           <p className="text-sm leading-relaxed text-muted-foreground line-clamp-2">{description}</p>
         ) : null}
       </CardHeader>
-      <CardContent className="space-y-4 pt-0">
+      <CardContent className="relative space-y-4 pt-0">
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
-            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Starts</dt>
+            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{startLabel}</dt>
             <dd className="mt-1 font-medium text-foreground">{dateTimeFormatter.format(new Date(room.start_date))}</dd>
           </div>
           <div className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
-            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ends</dt>
+            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{endLabel}</dt>
             <dd className="mt-1 font-medium text-foreground">{dateTimeFormatter.format(new Date(room.end_date))}</dd>
           </div>
         </dl>
-        <div className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Starting capital</p>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Starting capital</span>
+          <span className="font-mono text-lg font-semibold tabular-nums text-foreground">
             {formatWholeUsd(room.starting_balance)}
-          </p>
+          </span>
         </div>
         {variant === "discover" ? (
           <JoinPublicRoomButton roomId={room.id} />
+        ) : isEndedMemberCard ? (
+          <Button asChild variant="outline" size="lg" className={mutedResultsButtonClassName}>
+            <Link href={`/room/${room.id}`}>View results</Link>
+          </Button>
         ) : (
-          <Button asChild className="w-full font-medium shadow-sm shadow-primary/15" size="lg">
-            <Link href={`/room/${room.id}`}>Open lobby</Link>
+          <Button asChild variant="default" size="lg" className={openLobbyButtonClassName}>
+            <Link href={`/room/${room.id}`} className="inline-flex w-full items-center justify-center gap-2">
+              Open lobby
+              <ArrowRight className="size-4 opacity-90" aria-hidden />
+            </Link>
           </Button>
         )}
       </CardContent>

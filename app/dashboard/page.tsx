@@ -1,11 +1,15 @@
+import { Plus } from "lucide-react"
 import { redirect } from "next/navigation"
 import { CreateRoomDialog } from "@/components/create-room-dialog"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { JoinRoomDialog } from "@/components/join-room-dialog"
+import { MarketingBackdrop } from "@/components/marketing/marketing-backdrop"
 import { RoomCard } from "@/components/room-card"
 import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomJoinable } from "@/lib/competition-guards"
+import { createRoomTriggerClassName, joinRoomTriggerClassName } from "@/lib/dashboard-nav-triggers"
 import { getSql, withUserContext } from "@/lib/db"
+import { marketingFontClassName } from "@/lib/marketing-fonts"
 import type { Room } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -108,58 +112,81 @@ export default async function DashboardPage() {
   const hasJoinedRooms = joinedRooms.length > 0
   const hasDiscoverableRooms = discoverablePublicRooms.length > 0
   const isEmpty = !hasJoinedRooms && !hasDiscoverableRooms
+  const roomCountLabel = joinedRooms.length === 1 ? "room" : "rooms"
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-10">
-        <DashboardHeader username={user.username} imageUrl={user.image_url} />
+    <div
+      data-theme="marketing-dark"
+      className={`${marketingFontClassName} relative isolate min-h-screen overflow-hidden bg-background [font-family:var(--font-marketing-sans)]`}
+    >
+      <MarketingBackdrop />
+      <main className="relative z-10 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-10">
+          <DashboardHeader username={user.username} imageUrl={user.image_url} />
 
-        {hasDiscoverableRooms ? (
-          <section className="space-y-6">
-            <div className="space-y-1">
-              <h2 className="text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">
-                Open public competitions
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Join a public room from the list below. Private rooms still require a code from the host.
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {discoverablePublicRooms.map((room) => (
-                <RoomCard key={room.id} room={room} variant="discover" />
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        <section className="space-y-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Your competitions</h1>
-
-          {hasJoinedRooms ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {joinedRooms.map((room) => (
-                <RoomCard key={room.id} room={room} variant="member" />
-              ))}
-            </div>
-          ) : isEmpty ? (
-            <div className="rounded-2xl border border-dashed border-border/80 bg-card/40 p-10 text-center shadow-inner shadow-black/5 backdrop-blur-sm sm:p-14">
-              <h2 className="text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">No rooms yet</h2>
-              <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
-                Start a competition room, browse public competitions above when available, or enter a private room
-                code.
-              </p>
-              <div className="mt-8 flex flex-wrap justify-center gap-3">
-                <JoinRoomDialog />
-                <CreateRoomDialog />
+          {hasDiscoverableRooms ? (
+            <section className="space-y-6">
+              <div className="space-y-1">
+                <h2 className="text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">
+                  Open public competitions
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Join a public room from the list below. Private rooms still require a code from the host.
+                </p>
               </div>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {discoverablePublicRooms.map((room) => (
+                  <RoomCard key={room.id} room={room} variant="discover" />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="space-y-6">
+            <div className="flex items-end justify-between gap-4">
+              <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-2xl">Rooms</h1>
+              {hasJoinedRooms ? (
+                <span className="inline-flex shrink-0 items-center rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground">
+                  {joinedRooms.length} {roomCountLabel}
+                </span>
+              ) : null}
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              You have not joined any competitions yet. Browse public rooms above or enter a private code.
-            </p>
-          )}
-        </section>
-      </div>
-    </main>
+
+            {hasJoinedRooms ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {joinedRooms.map((room) => (
+                  <RoomCard key={room.id} room={room} variant="member" />
+                ))}
+              </div>
+            ) : isEmpty ? (
+              <div className="rounded-2xl border border-dashed border-border/80 bg-card/40 p-10 text-center shadow-inner shadow-black/5 backdrop-blur-sm sm:p-14">
+                <h2 className="text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">No rooms yet</h2>
+                <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+                  Start a competition room, browse public competitions above when available, or enter a private room
+                  code.
+                </p>
+                <div className="mt-8 flex flex-wrap justify-center gap-3">
+                  <JoinRoomDialog
+                    triggerVariant="outline"
+                    triggerSize="lg"
+                    triggerClassName={joinRoomTriggerClassName}
+                  />
+                  <CreateRoomDialog
+                    triggerVariant="default"
+                    triggerSize="lg"
+                    triggerClassName={createRoomTriggerClassName}
+                    triggerLeadingIcon={<Plus className="size-4 shrink-0" aria-hidden />}
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                You have not joined any competitions yet. Browse public rooms above or enter a private code.
+              </p>
+            )}
+          </section>
+        </div>
+      </main>
+    </div>
   )
 }

@@ -274,7 +274,7 @@ export const SignInForm = () => {
     <AuthGlassCard
       icon={LogIn}
       title="Sign in with email"
-      subtitle="Welcome back — compete on paper perpetuals with live prices."
+      subtitle="Welcome back. The leaderboard awaits."
     >
       <form className="space-y-4" onSubmit={handleSignInSubmit}>
         {formError ? (

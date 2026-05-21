@@ -3,6 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useClerk } from "@clerk/nextjs"
+import { Plus, UserRoundIcon } from "lucide-react"
 import { CreateRoomDialog } from "@/components/create-room-dialog"
 import { JoinRoomDialog } from "@/components/join-room-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -15,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { BRAND_LOGO_HEIGHT, BRAND_LOGO_SRC, BRAND_LOGO_WIDTH, BRAND_NAME } from "@/lib/brand"
-import { UserRoundIcon } from "lucide-react"
+import { createRoomTriggerClassName, joinRoomTriggerClassName } from "@/lib/dashboard-nav-triggers"
 
 type DashboardHeaderProps = {
   username: string
@@ -42,10 +43,10 @@ export const DashboardHeader = ({ username, imageUrl }: DashboardHeaderProps) =>
   }
 
   return (
-    <header className="flex flex-col gap-4 border-b border-border/60 pb-6 sm:flex-row sm:items-center sm:justify-between">
+    <header className="flex flex-col gap-4 border-b border-white/8 pb-6 sm:flex-row sm:items-center sm:justify-between">
       <Link
         href="/dashboard"
-        className="inline-flex shrink-0 items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="-ml-8 mt-4 inline-flex shrink-0 items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:-ml-9 mt-4"
         aria-label={`${BRAND_NAME} home`}
       >
         <Image
@@ -53,22 +54,19 @@ export const DashboardHeader = ({ username, imageUrl }: DashboardHeaderProps) =>
           alt={`${BRAND_NAME} logo`}
           width={BRAND_LOGO_WIDTH}
           height={BRAND_LOGO_HEIGHT}
-          className="h-8 w-auto max-w-[200px] sm:h-9"
+          className="h-[3.3rem] w-auto max-w-[336px] object-left sm:h-[3.6rem]"
           priority
           unoptimized
         />
       </Link>
 
       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-        <JoinRoomDialog
-          triggerVariant="outline"
-          triggerSize="lg"
-          triggerClassName="border-border/80 bg-background/80 px-4 font-medium shadow-sm backdrop-blur-sm hover:bg-muted/60"
-        />
+        <JoinRoomDialog triggerVariant="outline" triggerSize="lg" triggerClassName={joinRoomTriggerClassName} />
         <CreateRoomDialog
           triggerVariant="default"
           triggerSize="lg"
-          triggerClassName="px-4 font-medium shadow-sm shadow-primary/20"
+          triggerClassName={createRoomTriggerClassName}
+          triggerLeadingIcon={<Plus className="size-4 shrink-0" aria-hidden />}
         />
 
         <DropdownMenu>
@@ -77,12 +75,12 @@ export const DashboardHeader = ({ username, imageUrl }: DashboardHeaderProps) =>
               type="button"
               variant="ghost"
               size="icon"
-              className="size-9 shrink-0 rounded-full p-0 ring-1 ring-border/80 hover:bg-muted/50"
+              className="size-11 shrink-0 rounded-full p-0 ring-1 ring-border/80 transition-colors hover:bg-muted/50 hover:ring-accent-neon/30"
               aria-label="Open account menu"
             >
-              <Avatar className="size-8">
+              <Avatar className="size-10">
                 {imageUrl ? <AvatarImage src={imageUrl} alt="" /> : null}
-                <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
+                <AvatarFallback className="bg-muted text-sm font-medium text-muted-foreground">
                   {initials}
                 </AvatarFallback>
               </Avatar>

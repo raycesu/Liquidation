@@ -1,7 +1,7 @@
 "use client"
 
 import type { VariantProps } from "class-variance-authority"
-import type { KeyboardEvent } from "react"
+import type { KeyboardEvent, ReactNode } from "react"
 import { useActionState, useState } from "react"
 import { createRoom } from "@/actions/rooms"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -25,6 +25,7 @@ export type CreateRoomDialogProps = {
   triggerVariant?: VariantProps<typeof buttonVariants>["variant"]
   triggerSize?: VariantProps<typeof buttonVariants>["size"]
   triggerClassName?: string
+  triggerLeadingIcon?: ReactNode
 }
 
 const initialState: ActionResult<{ roomId: string }> = {
@@ -39,6 +40,7 @@ export const CreateRoomDialog = (props?: CreateRoomDialogProps) => {
     triggerVariant = "default",
     triggerSize = "default",
     triggerClassName,
+    triggerLeadingIcon,
   } = props ?? {}
   const [state, formAction, isPending] = useActionState(createRoom, initialState)
   const [isPublic, setIsPublic] = useState(false)
@@ -70,6 +72,7 @@ export const CreateRoomDialog = (props?: CreateRoomDialogProps) => {
     <Dialog>
       <DialogTrigger asChild>
         <Button type="button" variant={triggerVariant} size={triggerSize} className={triggerClassName}>
+          {triggerLeadingIcon}
           Create room
         </Button>
       </DialogTrigger>

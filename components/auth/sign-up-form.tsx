@@ -190,7 +190,7 @@ export const SignUpForm = () => {
     <AuthGlassCard
       icon={UserPlus}
       title="Sign up with email"
-      subtitle="Create your account to join rooms and climb the leaderboard."
+      subtitle="Pick a username. Join a room. Start trading."
     >
       <form className="space-y-4" onSubmit={handleSignUpSubmit}>
         {formError ? (
@@ -240,7 +240,7 @@ export const SignUpForm = () => {
           disabled={isSubmitting}
           className="h-12 w-full rounded-xl border border-[#b8ebff]/70 bg-[#ecf8ff] text-sm font-semibold text-[#03101f] shadow-[0_10px_24px_rgb(17_191_255/0.18)] hover:bg-white"
         >
-          {isSubmitting ? <Loader2 className="size-4 animate-spin" aria-hidden /> : "Get started"}
+          {isSubmitting ? <Loader2 className="size-4 animate-spin" aria-hidden /> : "Create account"}
         </Button>
       </form>
 
