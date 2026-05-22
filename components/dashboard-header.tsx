@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useClerk } from "@clerk/nextjs"
-import { Plus, UserRoundIcon } from "lucide-react"
+import { LogOut, Plus, UserRoundIcon } from "lucide-react"
 import { CreateRoomDialog } from "@/components/create-room-dialog"
 import { JoinRoomDialog } from "@/components/join-room-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -17,11 +17,22 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { BRAND_LOGO_HEIGHT, BRAND_LOGO_SRC, BRAND_LOGO_WIDTH, BRAND_NAME } from "@/lib/brand"
 import { createRoomTriggerClassName, joinRoomTriggerClassName } from "@/lib/dashboard-nav-triggers"
+import { cn } from "@/lib/utils"
 
 type DashboardHeaderProps = {
   username: string
   imageUrl: string | null
+  activeRoomCount: number
 }
+
+const accountMenuItemClassName =
+  "gap-3 rounded-lg px-3 py-2.5 text-base text-text-primary outline-none focus:!bg-white/10 focus:!text-text-primary data-[highlighted]:!bg-white/10 data-[highlighted]:!text-text-primary"
+
+const profileMenuIconClassName =
+  "size-5 shrink-0 stroke-[#9eb8d6] transition-[stroke] in-data-[highlighted]:stroke-[#f0f7ff]"
+
+const signOutMenuIconClassName =
+  "size-5 shrink-0 stroke-[#ff3b5c] transition-[stroke] in-data-[highlighted]:stroke-[#ff6b85]"
 
 const getInitials = (username: string) => {
   const parts = username.split(/[\s._-]+/).filter(Boolean)
@@ -34,7 +45,14 @@ const getInitials = (username: string) => {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase() || "?"
 }
 
-export const DashboardHeader = ({ username, imageUrl }: DashboardHeaderProps) => {
+const formatActiveRoomLabel = (count: number) => {
+  if (count === 1) {
+    return "1 active room"
+  }
+  return `${count} active rooms`
+}
+
+export const DashboardHeader = ({ username, imageUrl, activeRoomCount }: DashboardHeaderProps) => {
   const { signOut } = useClerk()
   const initials = getInitials(username)
 
@@ -86,15 +104,44 @@ export const DashboardHeader = ({ username, imageUrl }: DashboardHeaderProps) =>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-48" sideOffset={8}>
-            <DropdownMenuItem asChild>
-              <Link href="/dashboard/profile" className="cursor-default gap-2">
-                <UserRoundIcon className="size-4 opacity-70" aria-hidden />
-                Profile
+          <DropdownMenuContent
+            align="end"
+            sideOffset={8}
+            className="w-[260px] min-w-[260px] border border-white/10 bg-[#0f1624]/95 p-3 shadow-xl backdrop-blur-md"
+          >
+            <div className="flex items-center gap-3.5 px-1 py-1">
+              <Avatar className="size-10 shrink-0">
+                {imageUrl ? <AvatarImage src={imageUrl} alt="" /> : null}
+                <AvatarFallback className="bg-muted text-sm font-medium text-muted-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-base font-medium text-text-primary">{username}</p>
+                <p className="text-sm text-muted-foreground">{formatActiveRoomLabel(activeRoomCount)}</p>
+              </div>
+            </div>
+
+            <DropdownMenuSeparator className="my-2 bg-white/8" />
+
+            <DropdownMenuItem asChild className={accountMenuItemClassName}>
+              <Link href="/dashboard/profile" className="flex cursor-default items-center gap-3">
+                <UserRoundIcon className={profileMenuIconClassName} aria-hidden />
+                View profile
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={handleSignOut}>
+
+            <DropdownMenuSeparator className="my-2 bg-white/8" />
+
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={handleSignOut}
+              className={cn(
+                accountMenuItemClassName,
+                "text-destructive focus:!text-destructive data-[highlighted]:!text-destructive",
+              )}
+            >
+              <LogOut className={signOutMenuIconClassName} aria-hidden />
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>

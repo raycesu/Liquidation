@@ -46,3 +46,29 @@ export const formatHoldMs = (ms: number | null) => {
 
   return `${(hours / 24).toFixed(1)} d`
 }
+
+/** Profile gauge label: e.g. "1d 6.3h" */
+export const formatHoldMsDaysAndHours = (ms: number | null) => {
+  if (ms == null || !Number.isFinite(ms) || ms <= 0) {
+    return "—"
+  }
+
+  const totalHours = ms / 3_600_000
+
+  if (totalHours < 1) {
+    return `${Math.round(ms / 60_000)}m`
+  }
+
+  if (totalHours < 24) {
+    return `${totalHours.toFixed(1)}h`
+  }
+
+  const days = Math.floor(totalHours / 24)
+  const remainderHours = totalHours - days * 24
+
+  if (remainderHours < 0.05) {
+    return `${days}d`
+  }
+
+  return `${days}d ${remainderHours.toFixed(1)}h`
+}

@@ -89,6 +89,19 @@ export const formatProfileDate = (iso: string) => {
   })
 }
 
+export const formatJoinMonthYear = (iso: string): string | null => {
+  const date = new Date(iso)
+
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    year: "numeric",
+  })
+}
+
 export const formatDateTime = (iso: string) => {
   const date = new Date(iso)
 

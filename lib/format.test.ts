@@ -1,9 +1,22 @@
 import {
+  formatJoinMonthYear,
   formatPnlWithPercent,
   formatShareAssetLabel,
   formatUsdRounded,
   formatUsdTenCents,
 } from "@/lib/format"
+
+describe("formatJoinMonthYear", () => {
+  it("returns month and year for valid ISO strings", () => {
+    const result = formatJoinMonthYear("2025-01-15T12:00:00.000Z")
+    expect(result).toMatch(/Jan/)
+    expect(result).toMatch(/2025/)
+  })
+
+  it("returns null for invalid dates", () => {
+    expect(formatJoinMonthYear("not-a-date")).toBeNull()
+  })
+})
 
 describe("formatUsdRounded", () => {
   it("rounds to the nearest dollar", () => {

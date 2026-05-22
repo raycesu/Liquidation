@@ -9,16 +9,26 @@ type ProfileStatsOverviewCardProps = {
   topSymbols: ProfileTradingStyle["topSymbols"]
 }
 
-type DetailRowProps = {
+const sectionTitleClassName =
+  "text-xs font-semibold uppercase tracking-wider text-text-secondary"
+
+type HighlightTileProps = {
   label: string
   value: string
   valueClassName?: string
 }
 
-const DetailRow = ({ label, value, valueClassName }: DetailRowProps) => (
-  <div className="flex items-center justify-between gap-4 py-3">
-    <span className="text-sm text-text-secondary">{label}</span>
-    <span className={cn("text-sm font-semibold tabular-nums text-text-primary", valueClassName)}>{value}</span>
+const HighlightTile = ({ label, value, valueClassName }: HighlightTileProps) => (
+  <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+    <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary">{label}</p>
+    <p
+      className={cn(
+        "mt-1.5 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl",
+        valueClassName ?? "text-text-primary",
+      )}
+    >
+      {value}
+    </p>
   </div>
 )
 
@@ -42,43 +52,40 @@ export const ProfileStatsOverviewCard = ({ summary, topSymbols }: ProfileStatsOv
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-white/10",
+        "relative h-full overflow-hidden rounded-2xl border border-white/10",
         "bg-[#050a14] bg-[radial-gradient(ellipse_80%_60%_at_100%_0%,rgb(17_201_255/0.22),transparent_55%),radial-gradient(ellipse_50%_40%_at_0%_100%,rgb(10_140_255/0.12),transparent_50%)]",
         "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-sm",
       )}
     >
-      <div className="relative p-5 sm:p-6">
+      <div className="relative p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold text-text-primary">Stats Overview</h2>
+          <h2 className={sectionTitleClassName}>Stats overview</h2>
           <span className="shrink-0 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 text-xs font-medium text-text-secondary">
             All time
           </span>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-6">
-          <div>
-            <p className="text-xs text-text-secondary">Competitions entered</p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-text-primary sm:text-4xl">
-              {summary.competitionsEntered}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-text-secondary">All-time avg P&amp;L</p>
-            <p className={cn("mt-1 text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl", avgPnlClassName)}>
-              {avgPnlDisplay}
-            </p>
-          </div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <HighlightTile
+            label="All-time avg P&L"
+            value={avgPnlDisplay}
+            valueClassName={avgPnlClassName}
+          />
+          <HighlightTile
+            label="Best trade ROE"
+            value={bestTradeDisplay}
+            valueClassName={bestTradeClassName}
+          />
         </div>
 
-        <div className="mt-4 divide-y divide-white/8 border-t border-white/8">
-          <DetailRow label="Best trade (ROE)" value={bestTradeDisplay} valueClassName={bestTradeClassName} />
-          <div className="flex items-center justify-between gap-4 py-3">
+        <div className="mt-3 border-t border-white/8 pt-3">
+          <div className="flex items-center justify-between gap-4 py-2">
             <span className="text-sm text-text-secondary">Account wipeouts</span>
             <AccountWipeoutsDisplay wipeouts={summary.wipeouts} />
           </div>
         </div>
 
-        <div className="mt-5 border-t border-white/8 pt-5">
+        <div className="mt-3 border-t border-white/8 pt-3">
           <MostTradedBars topSymbols={topSymbols} maxItems={3} compact />
         </div>
       </div>

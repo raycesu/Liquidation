@@ -21,10 +21,10 @@ const signOutButtonClassName = cn(
 
 export const ProfilePageHeader = () => {
   return (
-    <header className="flex flex-col gap-4 border-b border-white/8 pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <header className="flex flex-col gap-4 border-b border-white/8 pb-5 sm:flex-row sm:items-center sm:justify-between sm:pb-6">
       <Link
         href="/dashboard"
-        className="inline-flex shrink-0 items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="-ml-2 inline-flex shrink-0 items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:-ml-7"
         aria-label={`${BRAND_NAME} home`}
       >
         <Image
@@ -32,7 +32,7 @@ export const ProfilePageHeader = () => {
           alt={`${BRAND_NAME} logo`}
           width={BRAND_LOGO_WIDTH}
           height={BRAND_LOGO_HEIGHT}
-          className="h-8 w-auto max-w-[200px] sm:h-9"
+          className="h-11 w-auto sm:h-12"
           priority
           unoptimized
         />

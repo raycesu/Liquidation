@@ -10,6 +10,7 @@ import { assertRoomJoinable } from "@/lib/competition-guards"
 import { createRoomTriggerClassName, joinRoomTriggerClassName } from "@/lib/dashboard-nav-triggers"
 import { getSql, withUserContext } from "@/lib/db"
 import { marketingFontClassName } from "@/lib/marketing-fonts"
+import { getCompetitionPhase } from "@/lib/room-competition-status"
 import type { Room } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -113,6 +114,7 @@ export default async function DashboardPage() {
   const hasDiscoverableRooms = discoverablePublicRooms.length > 0
   const isEmpty = !hasJoinedRooms && !hasDiscoverableRooms
   const roomCountLabel = joinedRooms.length === 1 ? "room" : "rooms"
+  const activeRoomCount = joinedRooms.filter((room) => getCompetitionPhase(room) === "ongoing").length
 
   return (
     <div
@@ -122,7 +124,11 @@ export default async function DashboardPage() {
       <MarketingBackdrop />
       <main className="relative z-10 px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-10">
-          <DashboardHeader username={user.username} imageUrl={user.image_url} />
+          <DashboardHeader
+            username={user.username}
+            imageUrl={user.image_url}
+            activeRoomCount={activeRoomCount}
+          />
 
           {hasDiscoverableRooms ? (
             <section className="space-y-6">

@@ -1,18 +1,20 @@
 import { formatNumber } from "@/lib/format"
+import { cn } from "@/lib/utils"
 
 type LongShortBiasTankProps = {
   longBiasPercent: number
+  fillSpace?: boolean
 }
 
-export const LongShortBiasTank = ({ longBiasPercent }: LongShortBiasTankProps) => {
+export const LongShortBiasTank = ({ longBiasPercent, fillSpace = false }: LongShortBiasTankProps) => {
   const clampedLong = Math.min(100, Math.max(0, longBiasPercent))
   const shortBias = 100 - clampedLong
 
   return (
-    <div className="space-y-2">
+    <div className={cn("flex flex-col space-y-1.5", fillSpace && "flex-1")}>
       <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Long / short</p>
       <div
-        className="relative h-10 overflow-hidden rounded-lg border border-white/12 bg-black/40"
+        className="relative h-8 overflow-hidden rounded-lg border border-white/12 bg-black/40"
         role="img"
         aria-label={`${formatNumber(clampedLong, 1)} percent long, ${formatNumber(shortBias, 1)} percent short`}
       >

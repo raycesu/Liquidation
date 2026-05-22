@@ -23,13 +23,13 @@ export const ProfileTradingStyleCard = ({ style, embedded = false }: ProfileTrad
 
   if (embedded) {
     return (
-      <div className={styleCardClassName}>
-        <div className="relative p-5 sm:p-6">
-          <h2 className="text-lg font-semibold text-text-primary">Style</h2>
-          <div className="mt-6 space-y-6">
-            <LongShortBiasTank longBiasPercent={style.longBiasPercent} />
-            <LeverageSpectrum averageLeverage={style.averageLeverage} />
-            <HoldTimeSpectrum averageHoldMs={style.averageHoldMs} />
+      <div className={cn(styleCardClassName, "flex h-full flex-col overflow-visible")}>
+        <div className="relative flex min-h-0 flex-1 flex-col p-4 pb-5 sm:p-5">
+          <h2 className="shrink-0 text-xs font-semibold uppercase tracking-wider text-text-secondary">Style</h2>
+          <div className="mt-3 flex min-h-0 flex-1 flex-col justify-between gap-3 sm:gap-4">
+            <LongShortBiasTank longBiasPercent={style.longBiasPercent} fillSpace />
+            <LeverageSpectrum averageLeverage={style.averageLeverage} fillSpace />
+            <HoldTimeSpectrum averageHoldMs={style.averageHoldMs} fillSpace />
           </div>
         </div>
       </div>

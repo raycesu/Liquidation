@@ -32,8 +32,13 @@ export default async function DashboardProfilePage() {
       <MarketingBackdrop />
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-col px-4 py-6 sm:py-8">
         <ProfilePageHeader />
-        <section className="mt-6 flex flex-col gap-6">
-          <ProfileHero username={user.username} imageUrl={user.image_url} />
+        <section className="mt-7 flex flex-col gap-6 sm:mt-8">
+          <ProfileHero
+            username={user.username}
+            imageUrl={user.image_url}
+            joinedAt={user.created_at}
+            competitionsEntered={profileData.summary.competitionsEntered}
+          />
           <ProfilePageTabs
             summary={profileData.summary}
             tradingStyle={profileData.tradingStyle}

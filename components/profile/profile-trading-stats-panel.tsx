@@ -9,7 +9,7 @@ type ProfileTradingStatsPanelProps = {
 
 export const ProfileTradingStatsPanel = ({ summary, tradingStyle }: ProfileTradingStatsPanelProps) => {
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid items-stretch gap-4 lg:grid-cols-2 lg:gap-5">
       <ProfileStatsOverviewCard summary={summary} topSymbols={tradingStyle.topSymbols} />
       <ProfileTradingStyleCard style={tradingStyle} embedded />
     </div>
