@@ -1,4 +1,4 @@
-import { formatPercent } from "@/lib/format"
+import { formatPercent, formatShareAssetLabel } from "@/lib/format"
 import type { ProfileRoomCompetitionStats, ProfileRoomTradeHighlight } from "@/lib/profile-room-competition-stats"
 import { cn } from "@/lib/utils"
 
@@ -11,21 +11,21 @@ type StatCardProps = {
   value: string
 }
 
+const breakdownCardClassName = "rounded-xl border border-border/70 bg-card/70 px-4 py-3"
+
 const StatCard = ({ label, value }: StatCardProps) => (
-  <div className="rounded-xl border border-border bg-background/60 px-4 py-3">
-    <p className="text-xs text-text-secondary">{label}</p>
+  <div className={breakdownCardClassName}>
+    <p className="text-[0.65rem] font-medium uppercase tracking-wider text-text-secondary">{label}</p>
     <p className="mt-1 text-lg font-semibold tabular-nums text-text-primary">{value}</p>
   </div>
 )
-
-const formatAssetLabel = (symbol: string) => symbol.replace("USDT", "")
 
 const TradeHighlightRow = ({ trade }: { trade: ProfileRoomTradeHighlight }) => {
   const pnlClass = trade.roePercent >= 0 ? "text-profit" : "text-loss"
 
   return (
-    <li className="flex items-center justify-between gap-3 text-sm">
-      <span className="font-semibold text-text-primary">{formatAssetLabel(trade.symbol)}</span>
+    <li className="flex items-center justify-between gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
+      <span className="font-semibold text-text-primary">{formatShareAssetLabel(trade.symbol)}</span>
       <span className={cn("font-mono font-semibold tabular-nums", pnlClass)}>
         {trade.roePercent >= 0 ? "+" : ""}
         {formatPercent(trade.roePercent)}
@@ -36,16 +36,24 @@ const TradeHighlightRow = ({ trade }: { trade: ProfileRoomTradeHighlight }) => {
 
 type TradeListProps = {
   title: string
+  titleClassName: string
   trades: ProfileRoomTradeHighlight[]
 }
 
-const TradeList = ({ title, trades }: TradeListProps) => (
-  <div className="rounded-xl border border-border bg-background/60 p-4">
-    <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{title}</h3>
+const TradeList = ({ title, titleClassName, trades }: TradeListProps) => (
+  <div className={cn(breakdownCardClassName, "p-4")}>
+    <h3
+      className={cn(
+        "text-[0.65rem] font-semibold uppercase tracking-wider",
+        titleClassName,
+      )}
+    >
+      {title}
+    </h3>
     {trades.length === 0 ? (
       <p className="mt-3 text-sm text-text-secondary">No closed trades yet.</p>
     ) : (
-      <ul className="mt-3 space-y-2.5">
+      <ul className="mt-3 divide-y divide-border/35">
         {trades.map((trade) => (
           <TradeHighlightRow key={trade.tradeId} trade={trade} />
         ))}
@@ -59,7 +67,7 @@ export const ProfileCompetitionBreakdownStrip = ({ stats }: ProfileCompetitionBr
   const leverageDisplay =
     stats.averageLeverage != null ? `${stats.averageLeverage.toFixed(1)}x` : "—"
   const mostTradedDisplay =
-    stats.mostTradedSymbol != null ? formatAssetLabel(stats.mostTradedSymbol) : "—"
+    stats.mostTradedSymbol != null ? formatShareAssetLabel(stats.mostTradedSymbol) : "—"
 
   return (
     <div className="flex flex-col gap-4">
@@ -69,8 +77,8 @@ export const ProfileCompetitionBreakdownStrip = ({ stats }: ProfileCompetitionBr
         <StatCard label="Most traded" value={mostTradedDisplay} />
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <TradeList title="Best trades" trades={stats.bestTrades} />
-        <TradeList title="Worst trades" trades={stats.worstTrades} />
+        <TradeList title="Best trades" titleClassName="text-profit" trades={stats.bestTrades} />
+        <TradeList title="Worst trades" titleClassName="text-loss" trades={stats.worstTrades} />
       </div>
     </div>
   )

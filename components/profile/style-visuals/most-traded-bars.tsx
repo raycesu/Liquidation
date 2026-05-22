@@ -1,5 +1,6 @@
-import { cn } from "@/lib/utils"
+import { formatShareAssetLabel } from "@/lib/format"
 import type { SupportedSymbol } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 type SymbolCount = {
   symbol: SupportedSymbol
@@ -43,7 +44,7 @@ export const MostTradedBars = ({ topSymbols, maxItems = 5, compact = false }: Mo
                     : "border-white/10 bg-white/[0.04] text-text-primary",
                 )}
               >
-                {row.symbol.replace("USDT", "")}
+                {formatShareAssetLabel(row.symbol)}
               </span>
               <div className={cn("min-w-0 flex-1 h-2 overflow-hidden rounded-full bg-white/8", compact && "h-1.5")}>
                 <div
