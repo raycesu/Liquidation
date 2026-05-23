@@ -28,7 +28,7 @@ export const UserProfileShell = ({ children }: UserProfileShellProps) => {
             alt=""
             width={BRAND_LOGO_WIDTH}
             height={BRAND_LOGO_HEIGHT}
-            className="h-8 w-auto sm:h-9"
+            className="h-11 w-auto sm:h-12"
             priority
             unoptimized
           />

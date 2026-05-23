@@ -106,25 +106,42 @@ export const ProfilePhotoUploader = () => {
 
   return (
     <div className="flex flex-col items-center text-center">
-      <div className="relative size-24 shrink-0 overflow-hidden rounded-full border border-white/15 bg-white/[0.04] ring-2 ring-accent-neon/40 shadow-[0_0_24px_rgb(16_199_255/0.18)]">
+      <button
+        type="button"
+        onClick={handlePickFile}
+        disabled={isUploading}
+        aria-label="Upload profile photo"
+        className={cn(
+          "group relative size-44 shrink-0 overflow-hidden rounded-full border border-white/15 bg-white/[0.04]",
+          "ring-2 ring-accent-neon/40 shadow-[0_0_24px_rgb(16_199_255/0.18)]",
+          "cursor-pointer outline-none transition-opacity disabled:cursor-not-allowed disabled:opacity-60",
+          "focus-visible:ring-3 focus-visible:ring-accent-neon/50",
+        )}
+      >
         {avatarUrl ? (
           <Image
             src={avatarUrl}
             alt={`${displayName} profile photo`}
             fill
             className="object-cover"
-            sizes="96px"
+            sizes="176px"
             unoptimized
           />
         ) : (
           <div
-            className="flex size-full items-center justify-center text-2xl font-semibold text-[#87abcf]"
+            className="flex size-full items-center justify-center text-4xl font-semibold text-[#87abcf]"
             aria-hidden
           >
             {getInitials(displayName)}
           </div>
         )}
-      </div>
+        <span
+          className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          aria-hidden
+        >
+          <Camera className="size-8 text-white" />
+        </span>
+      </button>
 
       <input
         ref={fileInputRef}
@@ -163,7 +180,10 @@ export const ProfilePhotoUploader = () => {
           <Button
             type="button"
             variant="outline"
-            className="h-10 w-full rounded-xl border-white/12 bg-white/[0.04] text-[#87abcf] hover:border-white/20 hover:bg-white/[0.08] hover:text-[#e6f3ff]"
+            className={cn(
+              "h-11 w-full rounded-xl border border-[rgba(239,68,68,0.4)] bg-transparent text-sm font-semibold text-[#ef4444]/80",
+              "shadow-none hover:border-[rgba(239,68,68,0.55)] hover:bg-transparent hover:text-[#ef4444]/90",
+            )}
             onClick={handleRemovePhoto}
             disabled={isUploading}
           >

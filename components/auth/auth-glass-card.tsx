@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 type AuthGlassCardProps = {
-  icon: LucideIcon
+  icon?: LucideIcon
   title: string
   subtitle: string
   children: ReactNode
@@ -24,10 +24,17 @@ export const AuthGlassCard = ({
         className,
       )}
     >
-      <div className="mx-auto flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] shadow-[inset_0_1px_0_rgb(255_255_255/0.08)]">
-        <Icon className="size-5 text-accent-neon" aria-hidden />
-      </div>
-      <h1 className="mt-6 text-center text-2xl font-semibold tracking-tight text-[#e6f3ff] [font-family:var(--font-marketing-heading)]">
+      {Icon ? (
+        <div className="mx-auto flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] shadow-[inset_0_1px_0_rgb(255_255_255/0.08)]">
+          <Icon className="size-5 text-accent-neon" aria-hidden />
+        </div>
+      ) : null}
+      <h1
+        className={cn(
+          "text-center text-2xl font-semibold tracking-tight text-[#e6f3ff] [font-family:var(--font-marketing-heading)]",
+          Icon ? "mt-6" : "mt-0",
+        )}
+      >
         {title}
       </h1>
       <p className="mt-2 text-center text-sm leading-relaxed text-[#87abcf]">{subtitle}</p>
