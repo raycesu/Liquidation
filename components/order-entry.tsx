@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, InfoIcon } from "lucide-react"
 import { useMemo, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { placeLimitOrder } from "@/actions/place-limit-order"
@@ -10,6 +10,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { formatNumber, formatUsd } from "@/lib/format"
 import { getMarket, getMaxLeverage } from "@/lib/markets"
@@ -394,6 +399,7 @@ export const OrderEntry = ({
 
   const submitLabel = orderType === "LIMIT" ? "Place Limit Order" : `${side === "LONG" ? "Buy / Long" : "Sell / Short"} ${baseSymbol}`
   const orderValue = Number.isFinite(numericSize) && numericSize > 0 ? numericSize : 0
+  const hasOrderPreview = Number.isFinite(numericSize) && numericSize > 0
 
   return (
     <Card className="border-border/70 bg-surface/90 shadow-2xl shadow-background/30 backdrop-blur">
@@ -689,41 +695,49 @@ export const OrderEntry = ({
           </p>
         ) : null}
 
-        <div className="space-y-2 rounded-xl border border-border/70 bg-background/35 p-3 text-sm shadow-inner shadow-background/30">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Liquidation Price</span>
-            <span className="font-mono text-text-primary">
-              {liquidationPreview ? formatNumber(liquidationPreview) : "N/A"}
-            </span>
+        {hasOrderPreview ? (
+          <div className="animate-in fade-in-0 slide-in-from-top-2 space-y-2 rounded-xl border border-border/70 bg-background/35 p-3 text-sm shadow-inner shadow-background/30 duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Liquidation Price</span>
+              <span className="font-mono text-text-primary">
+                {liquidationPreview != null ? formatNumber(liquidationPreview) : "—"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Order Value</span>
+              <span className="font-mono text-text-primary">{formatUsd(orderValue)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Est. Trade Fee</span>
+              <span className="font-mono text-text-primary">{formatUsd(estimatedTradeFee)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Margin Required</span>
+              <span className="font-mono text-text-primary">{formatUsd(requiredMargin)}</span>
+            </div>
+            <div className="flex items-center justify-between border-t border-border/50 pt-2">
+              <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">
+                Position Margin
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      tabIndex={0}
+                      aria-label="Isolated margin explanation"
+                      className="inline-flex size-5 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-muted/40 hover:text-text-primary"
+                    >
+                      <InfoIcon className="size-3" aria-hidden />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-left leading-relaxed">
+                    Isolated margin: the trade fee is taken from position collateral. Available balance is reduced by margin required only.
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+              <span className="font-mono text-text-primary">{formatUsd(positionMarginPreview)}</span>
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Order Value</span>
-            <span className="font-mono text-text-primary">
-              {orderValue > 0 ? formatUsd(orderValue) : "N/A"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Est. Trade Fee</span>
-            <span className="font-mono text-text-primary">
-              {estimatedTradeFee > 0 ? formatUsd(estimatedTradeFee) : "N/A"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Margin Required</span>
-            <span className="font-mono text-text-primary">
-              {requiredMargin > 0 ? formatUsd(requiredMargin) : "N/A"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between border-t border-border/50 pt-2">
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-secondary">Position Margin</span>
-            <span className="font-mono text-text-primary">
-              {positionMarginPreview > 0 ? formatUsd(positionMarginPreview) : "N/A"}
-            </span>
-          </div>
-          <p className="text-[10px] leading-relaxed text-text-secondary">
-            Isolated margin: the trade fee is taken from position collateral. Available balance is reduced by margin required only.
-          </p>
-        </div>
+        ) : null}
       </CardContent>
     </Card>
   )

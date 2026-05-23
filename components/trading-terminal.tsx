@@ -12,6 +12,7 @@ import { TradingViewChart } from "@/components/tradingview-chart"
 import { AssetSelector } from "@/components/asset-selector"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { useBinanceTicker } from "@/hooks/useBinanceTicker"
 import { useTradingEngineSync } from "@/hooks/useTradingEngineSync"
 import { formatCompactUsd, formatNumber, formatPercent } from "@/lib/format"
@@ -327,22 +328,24 @@ export const TradingTerminal = ({
               onOrderCancelled={handleOrderCancelled}
             />
           </div>
-          <div className="flex flex-col gap-3">
-            <OrderEntry
-              key={symbol}
-              participantId={participantId}
-              roomId={roomId}
-              symbol={symbol}
-              availableMargin={availableMargin}
-              livePrice={selectedPrice}
-              positions={openPositions}
-              onOptimisticPosition={handleOptimisticPosition}
-              onOrderPlaced={handleOrderPlaced}
-              onOrderRejected={handleOrderRejected}
-              onLimitOrderPlaced={handleLimitOrderPlaced}
-            />
-            <TradingFeesDisclaimer symbol={symbol} fundingRate={fundingRates[symbol]} />
-          </div>
+          <TooltipProvider>
+            <div className="flex flex-col gap-3">
+              <OrderEntry
+                key={symbol}
+                participantId={participantId}
+                roomId={roomId}
+                symbol={symbol}
+                availableMargin={availableMargin}
+                livePrice={selectedPrice}
+                positions={openPositions}
+                onOptimisticPosition={handleOptimisticPosition}
+                onOrderPlaced={handleOrderPlaced}
+                onOrderRejected={handleOrderRejected}
+                onLimitOrderPlaced={handleLimitOrderPlaced}
+              />
+              <TradingFeesDisclaimer symbol={symbol} fundingRate={fundingRates[symbol]} />
+            </div>
+          </TooltipProvider>
         </section>
       </div>
     </main>
