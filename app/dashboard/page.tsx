@@ -132,14 +132,9 @@ export default async function DashboardPage() {
 
           {hasDiscoverableRooms ? (
             <section className="space-y-6">
-              <div className="space-y-1">
-                <h2 className="text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">
-                  Open public competitions
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Join a public room from the list below. Private rooms still require a code from the host.
-                </p>
-              </div>
+              <h2 className="text-2xl font-semibold tracking-tight text-text-primary">
+                Public Competitions
+              </h2>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {discoverablePublicRooms.map((room) => (
                   <RoomCard key={room.id} room={room} variant="discover" />

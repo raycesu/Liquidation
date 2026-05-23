@@ -26,6 +26,18 @@ type ProfileHeroProps = {
 const metaPillClassName =
   "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-text-secondary"
 
+const profileMenuContentClassName =
+  "w-max min-w-0 !w-auto border border-white/[0.08] bg-[#0f1624]/95 p-1 shadow-xl backdrop-blur-md"
+
+const profileMenuItemClassName =
+  "w-full cursor-pointer gap-2.5 rounded-md px-3 py-2 text-sm text-text-primary outline-none focus:!bg-white/[0.08] focus:!text-text-primary data-[highlighted]:!bg-white/[0.08] data-[highlighted]:!text-text-primary"
+
+const profileMenuIconClassName =
+  "size-4 shrink-0 stroke-text-secondary transition-[stroke] in-data-[highlighted]:stroke-text-primary"
+
+const profileMenuSeparatorClassName =
+  "!mx-0 my-0 h-px w-full shrink-0 bg-[rgba(255,255,255,0.06)]"
+
 export const ProfileHero = ({
   username,
   imageUrl,
@@ -73,28 +85,32 @@ export const ProfileHero = ({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-9 shrink-0 text-text-secondary hover:bg-muted/60 hover:text-text-primary"
+                className="size-9 shrink-0 text-text-secondary hover:bg-muted/60 hover:text-text-primary data-[state=open]:bg-white/[0.14] data-[state=open]:text-text-primary"
                 aria-label="Profile actions"
               >
                 <MoreHorizontal className="size-5" aria-hidden />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-48" sideOffset={8}>
+            <DropdownMenuContent
+              align="start"
+              className={profileMenuContentClassName}
+              sideOffset={8}
+            >
               <DropdownMenuItem
-                className="cursor-pointer gap-2"
+                className={profileMenuItemClassName}
                 onSelect={() => setIsUsernameDialogOpen(true)}
               >
-                <Pencil className="size-4 opacity-70" aria-hidden />
+                <Pencil className={profileMenuIconClassName} aria-hidden />
                 Edit username
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
+              <DropdownMenuSeparator className={profileMenuSeparatorClassName} />
+              <DropdownMenuItem asChild className={profileMenuItemClassName}>
                 <Link
                   href="/user-profile/photo?redirect_url=/dashboard/profile"
-                  className="cursor-pointer gap-2"
+                  className="flex w-full items-center gap-2.5"
                 >
-                  <ImageIcon className="size-4 opacity-70" aria-hidden />
-                  Change profile photo
+                  <ImageIcon className={profileMenuIconClassName} aria-hidden />
+                  Change photo
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>

@@ -56,20 +56,19 @@ export const RoomCard = ({ room, variant = "member" }: RoomCardProps) => {
   const phase = getCompetitionPhase(room)
   const { label, badgeClass } = phaseCopy[phase]
   const { start: startLabel, end: endLabel } = dateLabelsByPhase[phase]
-  const description = room.description?.trim()
-  const isLiveMemberCard = variant === "member" && phase === "ongoing"
+  const isLiveCard = phase === "ongoing"
   const isEndedMemberCard = variant === "member" && phase === "ended"
 
   return (
     <Card
       className={cn(
         "relative overflow-hidden border-border/80 bg-card/80 shadow-lg shadow-black/10 ring-1 ring-border/40 backdrop-blur-sm transition-shadow hover:shadow-xl",
-        isLiveMemberCard
+        isLiveCard
           ? "border-accent-neon/25 ring-accent-neon/20 hover:ring-accent-neon/35"
           : "hover:ring-border/60",
       )}
     >
-      {isLiveMemberCard ? (
+      {isLiveCard ? (
         <div
           className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(circle_at_0%_0%,rgb(16_199_255/0.14),transparent_42%),radial-gradient(circle_at_100%_0%,rgb(16_199_255/0.14),transparent_42%)]"
           aria-hidden
@@ -91,9 +90,6 @@ export const RoomCard = ({ room, variant = "member" }: RoomCardProps) => {
             </Badge>
           </div>
         </div>
-        {variant === "discover" && description ? (
-          <p className="text-sm leading-relaxed text-muted-foreground line-clamp-2">{description}</p>
-        ) : null}
       </CardHeader>
       <CardContent className="relative space-y-4 pt-0">
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
