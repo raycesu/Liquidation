@@ -8,19 +8,19 @@ Signed-out visitors see a **marketing landing page** at `/`. Signed-in users wit
 
 ### Marketing and auth
 
-- **Landing page** — Full-viewport marketing hero (pill badge, gradient headline, terminal preview) and nav for signed-out users (`components/marketing/*`).
+- **Landing page** — Full-viewport marketing hero (pill badge, gradient headline, terminal preview), layered backdrop, and nav for signed-out users (`components/marketing/*`).
 - **Custom sign-in / sign-up** — Branded glass-card flows with email/password and **Google OAuth** (`components/auth/*`), plus SSO callback routes under `app/sign-in/sso-callback` and `app/sign-up/sso-callback`.
 - **Onboarding** — After first sign-up, users complete **`/onboarding`**: username (with suggestions and case-insensitive uniqueness) and optional avatar before entering the app. `requireOnboardedUser()` enforces this on dashboard, room, and trade routes.
 
 ### Competitions and social layer
 
-- **Dashboard** — Room cards with rounded equity/margin figures, competition status, and quick actions to create or join a room. **Public** competitions you have not joined appear in a discover section with a one-click **Join room** action.
+- **Dashboard** — Shared marketing backdrop shell, header with brand logo, **active room count**, and avatar menu (profile, account settings, sign out). **Your rooms** and **Discover public rooms** sections use glass-style cards; **live** competitions get an accent glow. Balances and key figures use **whole-dollar** formatting. Quick actions to **Create room** or **Join room** from the header.
+- **Create competition** — Two-step dialog: **Step 1** — room name, optional description (**25 words max**), and **Public vs Private** visibility cards with inline help. **Step 2** — starting balance with **$10K / $100K / $1M presets** (or custom), schedule (defaults to next half-hour start + 7-day end), and optional **late-join hours** with tooltip guidance (`components/create-room-dialog.tsx`, `lib/room-description.ts`).
 - **Public vs private rooms** — When creating a room, choose **Private** (hidden from browse; unique **six-character join code**, e.g. `A1B2C3`, shown in the lobby) or **Public** (listed on every trader’s dashboard; no join code). Enforced in Postgres via `is_public` and `rooms_visibility_join_code_check` (`lib/room-visibility.ts`).
 - **Late join window** — Optional **`late_join_hours`** on create: leave blank to allow joins until the competition ends; **`0`** to require joining before start; or a positive number (e.g. `48`) to allow late joins for that many hours after start. Enforced in app guards (`lib/room-join-policy.ts`, `lib/competition-guards.ts`) and RLS on `room_participants` inserts.
-- **Rooms** — Create competitions with name, optional **description**, schedule, starting balance, visibility, late-join policy, and active state.
-- **Join flow** — **Private:** enter a join code from the dashboard **Join room** dialog (rate-limited per user). **Public:** join from the dashboard discover card or lobby. Legacy `/join/[room_id]` redirects to the dashboard.
-- **Room lobby** — Competition metadata, visibility badge, join code (private only), late-join policy, description, status (upcoming / active / ended / settled), and a paginated **PnL leaderboard** (rank, trader, PnL, win rate, trades, free margin). Leaderboard metrics use the same PnL logic as profile competition history.
-- **Host participant management** — Room creators can **remove participants** from the lobby (cannot remove themselves; target must have **no open positions**). `components/room/room-participant-management.tsx`, `removeRoomParticipant` in `actions/rooms.ts`.
+- **Join flow** — **Private:** enter a six-character code in a **segmented code input** from the dashboard **Join room** dialog (rate-limited per user; not case-sensitive). **Public:** join from the dashboard discover card or lobby. Legacy `/join/[room_id]` redirects to the dashboard.
+- **Room lobby** — Hero header (`components/room/room-lobby-hero.tsx`) with competition name, description, **visibility badge**, status (upcoming / active / ended / settled), stat cards (balance, schedule, late-join policy), and **copy join code** for private rooms. Paginated **PnL leaderboard** with medal ranks for top three, trader avatars, **host** and **win-rate badges**, and links into the terminal. Leaderboard metrics use the same PnL logic as profile competition history.
+- **Host participant management** — Room creators remove participants **inline from the leaderboard** via a confirmation dialog (cannot remove themselves; target must have **no open positions**). `components/room/leaderboard-remove-participant.tsx`, `removeRoomParticipantAction` in `actions/rooms.ts`.
 - **End-of-competition settlement** — When `end_date` passes or a room is deactivated, the background engine **cancels all pending orders**, **closes open positions** at live marks, and sets **`settled_at`**. Trading and new joins are blocked after settlement (`lib/competition-guards.ts`, `lib/trading-engine/settle-room.ts`).
 
 ### Trading terminal
@@ -34,20 +34,21 @@ Signed-out visitors see a **marketing landing page** at `/`. Signed-in users wit
 - **Positions** — Open positions with live mark context, close positions, and attach or edit **TP/SL triggers** on existing positions.
 - **Open orders** — Pending limits and triggers (grouped when linked to a position or parent limit), cancel support, paginated **10 rows per page**.
 - **Trade history** — Fills, fees, and realized PnL for the current room participant, paginated like positions and open orders.
-- **Trading fees** — Maker **0.02%** on limit fills; taker **0.05%** on market opens and closes (TP/SL, manual close). No trading fee on liquidation.
+- **Trading fees** — Maker **0.02%** on limit fills; taker **0.05%** on market opens and closes (TP/SL, manual close). No trading fee on liquidation. The terminal shows a compact **Fees & funding** card with per-symbol hourly funding and a **tooltip** explaining isolated-margin funding rules (`components/trading-fees-disclaimer.tsx`).
 - **Funding (pure isolated margin)** — Hourly Hyperliquid-sourced funding is applied to each position’s **`margin_allocated`** (not wallet balance), which updates **liquidation price** and effective PnL. Longs pay / shorts receive when the HL rate is positive. Payments record **`actual_applied`** when margin cannot absorb the full debit. Positions at or below maintenance after funding are flagged for liquidation on the next engine pass (`lib/perpetuals.ts`, `lib/trading-engine/settle-position-funding.ts`, `run-funding-engine.ts`).
 - **Order watcher** — Server-side checks for pending limits and triggers as prices move (`lib/trading-rules.ts`); **liquidation** uses live marks when positions cross liquidation price.
 
 ### Profile and account
 
-- **`/dashboard/profile`** — Tabbed experience: **Trading Stats** (summary metrics and trading-style visuals), **Competition History** (expandable rows with a **stats strip**: win rate, average leverage, most-traded symbol, best/worst trades), and **Share competitions** (export-friendly PNG card via `html-to-image` and branded assets from `lib/brand.ts`).
-- **Profile settings** — Update username with validation and case-insensitive uniqueness checks.
+- **`/dashboard/profile`** — Profile hero with avatar, join date, competition count, and a **⋯ menu** for edit username, change photo, and account settings. Tabbed experience: **Trading Stats** (summary metrics and trading-style gauge visuals), **Competition History** (expandable rows with a **stats strip**: win rate, average leverage, most-traded symbol, best/worst trades), and **Share competitions** (competition picker, marketing-style backdrop preview, export-friendly PNG via `html-to-image` and branded assets from `lib/brand.ts`).
+- **Profile settings** — Update username in a dedicated dialog with validation and case-insensitive uniqueness checks.
 - **`/user-profile`** — Clerk account and security settings in a custom shell; **`/user-profile/photo`** for profile photo upload and sync to the app database.
 
 ### Developer experience
 
 - **Server Actions** for trading, rooms, profile onboarding, and per-room order/liquidation polling helpers.
 - **Modular trading engine** under `lib/trading-engine/*` — settlement, order fills, funding, liquidation, and shared close-position economics; orchestrated by `run-trading-engine.ts`.
+- **Shared UI tokens** — Lobby and dashboard card surfaces (`lib/room-card-surface.ts`), nav/dialog button styles (`lib/dashboard-nav-triggers.ts`), and room description word-limit helpers (`lib/room-description.ts`).
 - **Zod** validation, **Jest** + Testing Library for unit and component tests.
 - **TypeScript** throughout.
 - **Trading engine API** — `POST /api/engine/run` (secured with `ENGINE_CRON_SECRET`, rate-limited per IP) runs **settlement for due rooms**, then order fills, funding, and liquidation for all **ongoing** active rooms. Use an external scheduler ([cron-job.org](https://cron-job.org), recommended) because Vercel Hobby cron is once per day. The terminal also polls every 3s while open for low-latency fills.
@@ -57,7 +58,7 @@ Signed-out visitors see a **marketing landing page** at `/`. Signed-in users wit
 | Area | Choice |
 |------|--------|
 | Framework | Next.js 16, App Router |
-| UI | React 19, Tailwind CSS 4, shadcn/ui, Radix, Sonner |
+| UI | React 19, Tailwind CSS 4, shadcn/ui, Radix (incl. Tooltip), Sonner |
 | Auth | Clerk (`@clerk/nextjs`), custom sign-in/up UI |
 | Database | Neon serverless Postgres (`@neondatabase/serverless`) |
 | Market catalog | Generated from Hyperliquid + Binance (`npm run markets:refresh`) |
@@ -203,9 +204,9 @@ Commit the updated generated file when you intentionally change the tradable uni
 | `app/page.tsx` | Marketing home (signed out) or redirect to onboarding/dashboard |
 | `app/onboarding` | First-run username and profile setup |
 | `app/sign-in`, `app/sign-up` | Custom auth UI and SSO callbacks |
-| `app/dashboard` | Room list, join/create dialogs |
-| `app/dashboard/profile` | Profile tabs: stats, history, share |
-| `app/room/[room_id]` | Lobby, join code, paginated PnL leaderboard |
+| `app/dashboard` | Room list (your rooms + discover), header, join/create dialogs |
+| `app/dashboard/profile` | Profile hero, tabs: stats, history, share |
+| `app/room/[room_id]` | Lobby hero, stat cards, copy join code, paginated PnL leaderboard |
 | `app/room/[room_id]/trade` | Trading terminal |
 | `app/join/[room_id]` | Legacy redirect to dashboard |
 | `app/user-profile/[[...user-profile]]` | Account settings and `/photo` route |
@@ -219,19 +220,32 @@ Commit the updated generated file when you intentionally change the tradable uni
 | `lib/competition-guards.ts` | Block trading/join when competition ended, settled, or past late-join cutoff |
 | `lib/room-join-policy.ts` | Late-join cutoff and join-window helpers |
 | `lib/room-visibility.ts` | Public vs private room labels |
+| `components/create-room-dialog.tsx` | Two-step create flow: visibility, description, balance presets, schedule |
+| `components/join-room-dialog.tsx` | Private join dialog with segmented code input |
+| `components/room-code-input.tsx` | Six-character segmented join code field |
 | `components/join-public-room-button.tsx` | One-click join for discoverable public rooms |
-| `components/room/room-participant-management.tsx` | Host UI to remove participants |
+| `components/dashboard-header.tsx` | Brand logo, active room count, avatar menu, create/join triggers |
+| `components/room/room-lobby-hero.tsx` | Lobby header: name, stats, visibility, copy join code |
+| `components/room/pnl-leaderboard-section.tsx` | Paginated PnL leaderboard with medals and badges |
+| `components/room/leaderboard-remove-participant.tsx` | Host inline remove from leaderboard rows |
+| `components/room/copy-room-code-button.tsx` | Copy private join code to clipboard |
+| `components/room/room-visibility-badge.tsx` | Public / private badge for lobby and cards |
+| `components/trading-fees-disclaimer.tsx` | Compact fees + funding card with tooltip |
+| `lib/room-card-surface.ts` | Shared lobby/dashboard card glow and border tokens |
+| `lib/dashboard-nav-triggers.ts` | Shared create/join/lobby button class names |
+| `lib/room-description.ts` | Room description normalize and 25-word limit |
 | `lib/rate-limit.ts` | In-memory limits for engine cron and join-room |
 | `hooks/useTradingEngineSync.ts` | Terminal polling (3s) while trade UI is open |
 | `hooks/use-client-pagination.ts` | Shared pagination for terminal tables |
 | `actions/*` | Server Actions (orders, rooms, profile, liquidation) |
 | `components/trading-terminal.tsx` | Chart, ticker, order entry, tabbed positions/orders/history |
 | `components/table-pagination.tsx` | Reusable table pager (terminal + lobby) |
-| `components/marketing/*` | Landing page shell |
+| `components/marketing/*` | Landing page shell and shared backdrop layers |
 | `components/auth/*` | Sign-in, sign-up, OAuth |
 | `components/profile/*` | Profile tabs, competition breakdown strip, trading-style visuals |
-| `components/profile-share-card.tsx` | Shareable competition PNG export |
-| `components/room/pnl-leaderboard-section.tsx` | Room lobby PnL leaderboard |
+| `components/profile-share-card.tsx` | Shareable competition PNG export with competition picker |
+| `lib/format.ts` | USD/percent formatters (`formatUsdRounded`, `formatWholeUsd`, etc.) |
+| `lib/profile-style-visuals.ts` | Trading-style gauge helpers (leverage, hold time) |
 | `lib/room-leaderboard.ts` | Lobby leaderboard query and pagination helpers |
 | `lib/profile-room-competition-stats.ts` | Per-room stats aligned with lobby PnL |
 | `lib/auth.ts` | `requireCurrentUser`, `requireOnboardedUser`, profile setup gate |
