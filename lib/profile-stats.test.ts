@@ -1,6 +1,6 @@
 import {
   closedTradeRoePercent,
-  computeDisplayEquity,
+  computeParticipantEquity,
   computePnlPercentFromTotalPnl,
   isAccountBusted,
   maxOrNull,
@@ -8,14 +8,14 @@ import {
   pickTopTradesByPnl,
 } from "@/lib/profile-stats"
 
-describe("computeDisplayEquity", () => {
+describe("computeParticipantEquity", () => {
   it("sums free margin, open margin, and unrealized PnL", () => {
-    expect(computeDisplayEquity(1000, 500, 250)).toBe(1750)
-    expect(computeDisplayEquity(1000, 500, -300)).toBe(1200)
+    expect(computeParticipantEquity(1000, 500, 250)).toBe(1750)
+    expect(computeParticipantEquity(1000, 500, -300)).toBe(1200)
   })
 
   it("matches economic equity for open positions", () => {
-    expect(computeDisplayEquity(8000, 2000, 450)).toBe(10_450)
+    expect(computeParticipantEquity(8000, 2000, 450)).toBe(10_450)
   })
 })
 

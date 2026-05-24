@@ -2,9 +2,8 @@ import Image from "next/image"
 import Link from "next/link"
 import { Suspense, type ReactNode } from "react"
 import { UserProfileBackLink } from "@/components/user-profile/user-profile-back-link"
-import { MarketingBackdrop } from "@/components/marketing/marketing-backdrop"
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell"
 import { BRAND_LOGO_HEIGHT, BRAND_LOGO_SRC, BRAND_LOGO_WIDTH, BRAND_NAME } from "@/lib/brand"
-import { marketingFontClassName } from "@/lib/marketing-fonts"
 
 type UserProfileShellProps = {
   children: ReactNode
@@ -12,11 +11,7 @@ type UserProfileShellProps = {
 
 export const UserProfileShell = ({ children }: UserProfileShellProps) => {
   return (
-    <div
-      data-theme="marketing-dark"
-      className={`${marketingFontClassName} relative isolate flex h-dvh max-h-dvh flex-col overflow-hidden bg-background [font-family:var(--font-marketing-sans)]`}
-    >
-      <MarketingBackdrop />
+    <MarketingPageShell layout="viewport">
       <header className="relative z-10 flex flex-col gap-4 px-4 pt-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:pt-6 lg:px-8">
         <Link
           href="/"
@@ -48,6 +43,6 @@ export const UserProfileShell = ({ children }: UserProfileShellProps) => {
       <main className="relative z-10 flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 py-4 sm:px-6 sm:py-6">
         <div className="flex w-full max-w-4xl justify-center">{children}</div>
       </main>
-    </div>
+    </MarketingPageShell>
   )
 }

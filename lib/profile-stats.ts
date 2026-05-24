@@ -78,7 +78,7 @@ type RealizedPnlRow = {
 
 const EPS = 1e-6
 
-export { computeDisplayEquity, computeParticipantEquity } from "@/lib/participant-equity"
+export { computeParticipantEquity } from "@/lib/participant-equity"
 
 export { computePnlPercentFromTotalPnl, placementRankForParticipant } from "@/lib/participant-pnl"
 

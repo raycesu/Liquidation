@@ -3,13 +3,12 @@ import { redirect } from "next/navigation"
 import { CreateRoomDialog } from "@/components/create-room-dialog"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { JoinRoomDialog } from "@/components/join-room-dialog"
-import { MarketingBackdrop } from "@/components/marketing/marketing-backdrop"
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell"
 import { RoomCard } from "@/components/room-card"
 import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomJoinable } from "@/lib/competition-guards"
 import { createRoomTriggerClassName, joinRoomTriggerClassName } from "@/lib/dashboard-nav-triggers"
 import { getSql, withUserContext } from "@/lib/db"
-import { marketingFontClassName } from "@/lib/marketing-fonts"
 import { getCompetitionPhase } from "@/lib/room-competition-status"
 import type { Room } from "@/lib/types"
 
@@ -117,11 +116,7 @@ export default async function DashboardPage() {
   const activeRoomCount = joinedRooms.filter((room) => getCompetitionPhase(room) === "ongoing").length
 
   return (
-    <div
-      data-theme="marketing-dark"
-      className={`${marketingFontClassName} relative isolate min-h-screen overflow-hidden bg-background [font-family:var(--font-marketing-sans)]`}
-    >
-      <MarketingBackdrop />
+    <MarketingPageShell>
       <main className="relative z-10 px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-10">
           <DashboardHeader
@@ -188,6 +183,6 @@ export default async function DashboardPage() {
           </section>
         </div>
       </main>
-    </div>
+    </MarketingPageShell>
   )
 }

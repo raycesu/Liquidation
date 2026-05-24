@@ -1,14 +1,9 @@
-import { MarketingBackdrop } from "@/components/marketing/marketing-backdrop"
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell"
 import { Skeleton } from "@/components/ui/skeleton"
-import { marketingFontClassName } from "@/lib/marketing-fonts"
 
 export default function DashboardLoading() {
   return (
-    <div
-      data-theme="marketing-dark"
-      className={`${marketingFontClassName} relative isolate min-h-screen overflow-hidden bg-background [font-family:var(--font-marketing-sans)]`}
-    >
-      <MarketingBackdrop />
+    <MarketingPageShell>
       <main className="relative z-10 px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-10">
           <header className="flex flex-col gap-4 border-b border-white/8 pb-6 sm:flex-row sm:items-center sm:justify-between">
@@ -33,6 +28,6 @@ export default function DashboardLoading() {
           </section>
         </div>
       </main>
-    </div>
+    </MarketingPageShell>
   )
 }

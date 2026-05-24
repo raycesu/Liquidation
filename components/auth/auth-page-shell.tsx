@@ -1,9 +1,8 @@
 import Image from "next/image"
 import Link from "next/link"
 import type { ReactNode } from "react"
-import { MarketingBackdrop } from "@/components/marketing/marketing-backdrop"
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell"
 import { BRAND_LOGO_HEIGHT, BRAND_LOGO_SRC, BRAND_LOGO_WIDTH, BRAND_NAME } from "@/lib/brand"
-import { marketingFontClassName } from "@/lib/marketing-fonts"
 
 type AuthPageShellProps = {
   children: ReactNode
@@ -11,11 +10,7 @@ type AuthPageShellProps = {
 
 export const AuthPageShell = ({ children }: AuthPageShellProps) => {
   return (
-    <div
-      data-theme="marketing-dark"
-      className={`${marketingFontClassName} relative isolate flex min-h-screen flex-col overflow-hidden bg-background [font-family:var(--font-marketing-sans)]`}
-    >
-      <MarketingBackdrop />
+    <MarketingPageShell layout="flex">
       <header className="relative z-10 px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
         <Link
           href="/"
@@ -37,6 +32,6 @@ export const AuthPageShell = ({ children }: AuthPageShellProps) => {
       <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
         {children}
       </main>
-    </div>
+    </MarketingPageShell>
   )
 }

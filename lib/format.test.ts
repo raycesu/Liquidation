@@ -1,6 +1,5 @@
 import {
   formatJoinMonthYear,
-  formatPnlWithPercent,
   formatShareAssetLabel,
   formatUsdRounded,
   formatUsdTenCents,
@@ -31,12 +30,6 @@ describe("formatUsdTenCents", () => {
     expect(formatUsdTenCents(1830.58)).toBe("$1,830.6")
     expect(formatUsdTenCents(-54488.49)).toBe("-$54,488.5")
     expect(formatUsdTenCents(-60352)).toBe("-$60,352")
-  })
-})
-
-describe("formatPnlWithPercent", () => {
-  it("combines USD and percent return", () => {
-    expect(formatPnlWithPercent(-427175.15, -42.72)).toBe("-$427,175.15 (-42.72%)")
   })
 })
 

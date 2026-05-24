@@ -53,23 +53,3 @@ export const formatLateJoinPolicyParts = (room: Room): { primary: string; second
     secondary: `within ${hoursLabel} of start`,
   }
 }
-
-export const formatLateJoinPolicy = (room: Room): string => {
-  const { primary, secondary } = formatLateJoinPolicyParts(room)
-
-  if (!secondary) {
-    return primary
-  }
-
-  if (room.late_join_hours === 0) {
-    return `${primary} — ${secondary.toLowerCase()}`
-  }
-
-  if (room.late_join_hours !== null && room.late_join_hours > 0) {
-    const hoursLabel = room.late_join_hours === 1 ? "1 hour" : `${room.late_join_hours} hours`
-
-    return `Late joins allowed for ${hoursLabel} after start`
-  }
-
-  return `${primary} — ${secondary}`
-}

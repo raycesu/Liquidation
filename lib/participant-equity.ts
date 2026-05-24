@@ -4,6 +4,3 @@ export const computeParticipantEquity = (
   openMarginAllocated: number,
   unrealizedPnl: number,
 ) => availableMargin + openMarginAllocated + unrealizedPnl
-
-/** @deprecated Use computeParticipantEquity with open margin allocated. */
-export const computeDisplayEquity = computeParticipantEquity

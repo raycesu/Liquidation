@@ -29,9 +29,6 @@ export const formatUsdTenCents = (value: number) =>
     minimumFractionDigits: 0,
   }).format(Math.round(value * 10) / 10)
 
-export const formatPnlWithPercent = (totalPnl: number, pnlPercent: number) =>
-  `${formatUsd(totalPnl)} (${formatPercent(pnlPercent)})`
-
 export const formatNumber = (value: number, maximumFractionDigits = 2) =>
   new Intl.NumberFormat("en-US", {
     maximumFractionDigits,

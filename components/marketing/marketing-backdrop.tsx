@@ -1,12 +1,3 @@
-import {
-  MarketingBackdropLayers,
-  type MarketingBackdropTone,
-} from "@/components/marketing/marketing-backdrop-layers"
+import { MarketingBackdropLayers } from "@/components/marketing/marketing-backdrop-layers"
 
-type MarketingBackdropProps = {
-  tone?: MarketingBackdropTone
-}
-
-export const MarketingBackdrop = ({ tone = "default" }: MarketingBackdropProps) => {
-  return <MarketingBackdropLayers tone={tone} />
-}
+export const MarketingBackdrop = () => <MarketingBackdropLayers />

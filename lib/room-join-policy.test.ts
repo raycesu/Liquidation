@@ -1,5 +1,4 @@
 import {
-  formatLateJoinPolicy,
   formatLateJoinPolicyParts,
   getRoomJoinCutoff,
   isRoomJoinOpen,
@@ -97,29 +96,5 @@ describe("formatLateJoinPolicyParts", () => {
       primary: "Late joins allowed",
       secondary: "within 1 hour of start",
     })
-  })
-})
-
-describe("formatLateJoinPolicy", () => {
-  it("formats open until end policy", () => {
-    expect(formatLateJoinPolicy(baseRoom)).toBe("Late joins allowed — until end")
-  })
-
-  it("formats no late joiners policy", () => {
-    expect(formatLateJoinPolicy({ ...baseRoom, late_join_hours: 0 })).toBe(
-      "No late joiners — join before start",
-    )
-  })
-
-  it("formats hour window policy", () => {
-    expect(formatLateJoinPolicy({ ...baseRoom, late_join_hours: 48 })).toBe(
-      "Late joins allowed for 48 hours after start",
-    )
-  })
-
-  it("formats singular hour policy", () => {
-    expect(formatLateJoinPolicy({ ...baseRoom, late_join_hours: 1 })).toBe(
-      "Late joins allowed for 1 hour after start",
-    )
   })
 })

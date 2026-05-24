@@ -1,4 +1,4 @@
-import { createLeaderboardPageItems, type PaginationItem } from "@/lib/room-leaderboard"
+import { createPageItems, type PaginationItem } from "@/lib/pagination"
 
 export const TERMINAL_TABLE_PAGE_SIZE = 10
 
@@ -26,6 +26,6 @@ export const paginateItems = <T>(
     totalPages,
     pageStartIndex,
     visibleItems: items.slice(pageStartIndex, pageStartIndex + pageSize),
-    pageItems: createLeaderboardPageItems(currentPage, totalPages),
+    pageItems: createPageItems(currentPage, totalPages),
   }
 }

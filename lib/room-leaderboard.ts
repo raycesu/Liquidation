@@ -1,3 +1,4 @@
+import { paginateItems } from "@/lib/client-pagination"
 import { getSql } from "@/lib/db"
 import { buildUnrealizedPnlByParticipant, scoreParticipantsByTotalPnl } from "@/lib/participant-pnl"
 import { fetchMarketPrices } from "@/lib/pricing"
@@ -5,7 +6,9 @@ import type { ParticipantWithUser, Position } from "@/lib/types"
 
 export const leaderboardPageSize = 10
 
-export type PaginationItem = number | "ellipsis"
+import type { PaginationItem } from "@/lib/pagination"
+
+export type { PaginationItem }
 
 export type RankedParticipant = ParticipantWithUser & {
   realizedPnl: number
@@ -44,37 +47,19 @@ export const parseLeaderboardPage = (page: string | string[] | undefined) => {
   return parsed
 }
 
-export const createLeaderboardPageItems = (currentPage: number, totalPages: number): PaginationItem[] => {
-  if (totalPages <= 5) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1)
-  }
-
-  if (currentPage <= 3) {
-    return [1, 2, 3, 4, "ellipsis", totalPages]
-  }
-
-  if (currentPage >= totalPages - 2) {
-    return [1, "ellipsis", totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
-  }
-
-  return [1, "ellipsis", currentPage - 1, currentPage, currentPage + 1, "ellipsis", totalPages]
-}
-
 export const paginateRankedParticipants = (
   rankedParticipants: RankedParticipant[],
   requestedPage: number,
   pageSize = leaderboardPageSize,
 ): LeaderboardPageData => {
-  const totalPages = Math.max(1, Math.ceil(rankedParticipants.length / pageSize))
-  const currentPage = Math.min(requestedPage, totalPages)
-  const pageStartIndex = (currentPage - 1) * pageSize
+  const pagination = paginateItems(rankedParticipants, requestedPage, pageSize)
 
   return {
-    currentPage,
-    totalPages,
-    pageStartIndex,
-    visibleParticipants: rankedParticipants.slice(pageStartIndex, pageStartIndex + pageSize),
-    pageItems: createLeaderboardPageItems(currentPage, totalPages),
+    currentPage: pagination.currentPage,
+    totalPages: pagination.totalPages,
+    pageStartIndex: pagination.pageStartIndex,
+    visibleParticipants: pagination.visibleItems,
+    pageItems: pagination.pageItems,
   }
 }
 

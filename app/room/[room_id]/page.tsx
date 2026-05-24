@@ -1,10 +1,10 @@
 import { notFound, redirect } from "next/navigation"
-import { MarketingBackdrop } from "@/components/marketing/marketing-backdrop"
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell"
 import { PnlLeaderboardSection } from "@/components/room/pnl-leaderboard-section"
 import { RoomLobbyHero } from "@/components/room/room-lobby-hero"
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
-import { marketingFontClassName } from "@/lib/marketing-fonts"
+import { getCompetitionPhase } from "@/lib/room-competition-status"
 import { getRoomLeaderboard } from "@/lib/room-leaderboard"
 import type { Room, RoomParticipant } from "@/lib/types"
 
@@ -17,24 +17,6 @@ type RoomPageProps = {
   searchParams?: Promise<{
     page?: string | string[]
   }>
-}
-
-type RoomStatus = "upcoming" | "active" | "ended"
-
-const getRoomStatus = (room: Room): RoomStatus => {
-  const now = new Date()
-  const startDate = new Date(room.start_date)
-  const endDate = new Date(room.end_date)
-
-  if (!room.is_active || now > endDate) {
-    return "ended"
-  }
-
-  if (now < startDate) {
-    return "upcoming"
-  }
-
-  return "active"
 }
 
 export default async function RoomPage({ params, searchParams }: RoomPageProps) {
@@ -93,15 +75,11 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
   const { rankedParticipants, leaderboardPage } = await getRoomLeaderboard(room.id, search?.page)
   const isCreator = user.id === room.creator_id
 
-  const status = getRoomStatus(room)
+  const status = getCompetitionPhase(room)
   const roomDescription = room.description?.trim()
 
   return (
-    <div
-      data-theme="marketing-dark"
-      className={`${marketingFontClassName} relative isolate min-h-screen overflow-hidden bg-background [font-family:var(--font-marketing-sans)]`}
-    >
-      <MarketingBackdrop />
+    <MarketingPageShell>
       <main className="relative z-10 px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
           <RoomLobbyHero room={room} status={status} roomDescription={roomDescription} />
@@ -117,6 +95,6 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
           />
         </div>
       </main>
-    </div>
+    </MarketingPageShell>
   )
 }

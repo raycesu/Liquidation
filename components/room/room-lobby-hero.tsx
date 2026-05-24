@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatUsdRounded } from "@/lib/format"
 import { RoomVisibilityBadge } from "@/components/room/room-visibility-badge"
+import type { CompetitionPhase } from "@/lib/room-competition-status"
 import { formatLateJoinPolicyParts } from "@/lib/room-join-policy"
 import { isPrivateRoom } from "@/lib/room-visibility"
 import {
@@ -25,11 +26,9 @@ import {
 import { cn } from "@/lib/utils"
 import type { Room } from "@/lib/types"
 
-type RoomStatus = "upcoming" | "active" | "ended"
-
 type RoomLobbyHeroProps = {
   room: Room
-  status: RoomStatus
+  status: CompetitionPhase
   roomDescription?: string
 }
 
@@ -59,20 +58,20 @@ const formatCompetitionDateParts = (iso: string) => {
   }
 }
 
-const getStatusLabel = (status: RoomStatus) => {
+const getStatusLabel = (status: CompetitionPhase) => {
   if (status === "upcoming") {
     return "Upcoming"
   }
 
-  if (status === "active") {
+  if (status === "ongoing") {
     return "Active"
   }
 
   return "Ended"
 }
 
-const getStatusClassName = (status: RoomStatus) => {
-  if (status === "active") {
+const getStatusClassName = (status: CompetitionPhase) => {
+  if (status === "ongoing") {
     return "border-profit/30 bg-profit/10 text-profit hover:bg-profit/10"
   }
 
@@ -83,8 +82,8 @@ const getStatusClassName = (status: RoomStatus) => {
   return "border-loss/30 bg-loss/10 text-loss hover:bg-loss/10"
 }
 
-const getStatusDotClassName = (status: RoomStatus) => {
-  if (status === "active") {
+const getStatusDotClassName = (status: CompetitionPhase) => {
+  if (status === "ongoing") {
     return "bg-profit"
   }
 

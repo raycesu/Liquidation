@@ -1,11 +1,10 @@
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { MarketingBackdrop } from "@/components/marketing/marketing-backdrop"
+import { MarketingPageShell } from "@/components/marketing/marketing-page-shell"
 import { ProfileHero } from "@/components/profile/profile-hero"
 import { ProfilePageHeader } from "@/components/profile/profile-page-header"
 import { ProfilePageTabs } from "@/components/profile/profile-page-tabs"
 import { requireOnboardedUser } from "@/lib/auth"
-import { marketingFontClassName } from "@/lib/marketing-fonts"
 import { loadProfileDashboardData } from "@/lib/profile-stats"
 
 export const dynamic = "force-dynamic"
@@ -25,11 +24,7 @@ export default async function DashboardProfilePage() {
   const assetBaseUrl = host ? `${proto}://${host}` : ""
 
   return (
-    <div
-      data-theme="marketing-dark"
-      className={`${marketingFontClassName} relative isolate min-h-screen overflow-hidden bg-background [font-family:var(--font-marketing-sans)]`}
-    >
-      <MarketingBackdrop />
+    <MarketingPageShell>
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-col px-4 py-6 sm:py-8">
         <ProfilePageHeader />
         <section className="mt-7 flex flex-col gap-6 sm:mt-8">
@@ -48,6 +43,6 @@ export default async function DashboardProfilePage() {
           />
         </section>
       </main>
-    </div>
+    </MarketingPageShell>
   )
 }

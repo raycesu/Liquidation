@@ -102,6 +102,6 @@ describe("ProfilePageTabs", () => {
     )
 
     expect(screen.getByText("Trading Stats")).toBeInTheDocument()
-    expect(screen.getByText("Stats Overview")).toBeInTheDocument()
+    expect(screen.getByText("Stats overview")).toBeInTheDocument()
   })
 })
