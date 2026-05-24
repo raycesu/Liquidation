@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation"
+import { MarketingBackdrop } from "@/components/marketing/marketing-backdrop"
 import { PnlLeaderboardSection } from "@/components/room/pnl-leaderboard-section"
 import { RoomLobbyHero } from "@/components/room/room-lobby-hero"
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
+import { marketingFontClassName } from "@/lib/marketing-fonts"
 import { getRoomLeaderboard } from "@/lib/room-leaderboard"
 import type { Room, RoomParticipant } from "@/lib/types"
 
@@ -45,26 +47,26 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
   }
 
   const sql = getSql()
-  const rooms = (await sql`
+  const roomRows = (await sql`
     select
-      id::text,
-      creator_id,
-      name,
-      description,
-      is_public,
-      join_code,
-      starting_balance::float8 as starting_balance,
-      start_date::text,
-      end_date::text,
-      is_active,
-      settled_at::text,
-      late_join_hours,
-      created_at::text
-    from rooms
-    where id = ${roomId}
+      r.id::text,
+      r.creator_id,
+      r.name,
+      r.description,
+      r.is_public,
+      r.join_code,
+      r.starting_balance::float8 as starting_balance,
+      r.start_date::text,
+      r.end_date::text,
+      r.is_active,
+      r.settled_at::text,
+      r.late_join_hours,
+      r.created_at::text
+    from rooms r
+    where r.id = ${roomId}
     limit 1
   `) as Room[]
-  const room = rooms[0]
+  const room = roomRows[0]
 
   if (!room) {
     notFound()
@@ -95,21 +97,26 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
   const roomDescription = room.description?.trim()
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background px-4 py-8">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(23,201,255,0.18),transparent_34%),radial-gradient(circle_at_86%_10%,rgba(10,140,255,0.14),transparent_30%),linear-gradient(180deg,rgba(3,9,20,0),rgba(3,9,20,0.92))]" />
-      <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-5">
-        <RoomLobbyHero room={room} status={status} roomDescription={roomDescription} />
+    <div
+      data-theme="marketing-dark"
+      className={`${marketingFontClassName} relative isolate min-h-screen overflow-hidden bg-background [font-family:var(--font-marketing-sans)]`}
+    >
+      <MarketingBackdrop />
+      <main className="relative z-10 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
+          <RoomLobbyHero room={room} status={status} roomDescription={roomDescription} />
 
-        <PnlLeaderboardSection
-          leaderboardPage={leaderboardPage}
-          participantCount={rankedParticipants.length}
-          startingBalance={room.starting_balance}
-          getPageHref={(page) => `/room/${room.id}?page=${page}`}
-          isCreator={isCreator}
-          roomId={room.id}
-          creatorUserId={room.creator_id}
-        />
-      </div>
-    </main>
+          <PnlLeaderboardSection
+            leaderboardPage={leaderboardPage}
+            participantCount={rankedParticipants.length}
+            startingBalance={room.starting_balance}
+            getPageHref={(page) => `/room/${room.id}?page=${page}`}
+            isCreator={isCreator}
+            roomId={room.id}
+            creatorUserId={room.creator_id}
+          />
+        </div>
+      </main>
+    </div>
   )
 }

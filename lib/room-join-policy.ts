@@ -31,16 +31,45 @@ export const isRoomJoinOpen = (room: Room, now: Date = new Date()): boolean => {
   return now.getTime() < cutoff.getTime()
 }
 
-export const formatLateJoinPolicy = (room: Room): string => {
+export const formatLateJoinPolicyParts = (room: Room): { primary: string; secondary: string } => {
   if (room.late_join_hours === null) {
-    return "Open until competition ends"
+    return {
+      primary: "Late joins allowed",
+      secondary: "until end",
+    }
   }
 
   if (room.late_join_hours === 0) {
-    return "No late joiners — join before start"
+    return {
+      primary: "No late joiners",
+      secondary: "Join before start",
+    }
   }
 
   const hoursLabel = room.late_join_hours === 1 ? "1 hour" : `${room.late_join_hours} hours`
 
-  return `Late joins allowed for ${hoursLabel} after start`
+  return {
+    primary: "Late joins allowed",
+    secondary: `within ${hoursLabel} of start`,
+  }
+}
+
+export const formatLateJoinPolicy = (room: Room): string => {
+  const { primary, secondary } = formatLateJoinPolicyParts(room)
+
+  if (!secondary) {
+    return primary
+  }
+
+  if (room.late_join_hours === 0) {
+    return `${primary} — ${secondary.toLowerCase()}`
+  }
+
+  if (room.late_join_hours !== null && room.late_join_hours > 0) {
+    const hoursLabel = room.late_join_hours === 1 ? "1 hour" : `${room.late_join_hours} hours`
+
+    return `Late joins allowed for ${hoursLabel} after start`
+  }
+
+  return `${primary} — ${secondary}`
 }

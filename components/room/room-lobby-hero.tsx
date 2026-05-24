@@ -1,13 +1,27 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
-import { ArrowUpRight, BarChart3, DoorOpen } from "lucide-react"
+import {
+  ArrowUpRight,
+  BarChart3,
+  Calendar,
+  CandlestickChart,
+  Key,
+  UserPlus,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react"
 import { CopyRoomCodeButton } from "@/components/room/copy-room-code-button"
-import { RoomHeroBackground } from "@/components/room/room-hero-background"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { formatWholeUsd } from "@/lib/format"
-import { formatLateJoinPolicy } from "@/lib/room-join-policy"
-import { getRoomVisibilityLabel, isPrivateRoom } from "@/lib/room-visibility"
+import { formatUsdRounded } from "@/lib/format"
+import { RoomVisibilityBadge } from "@/components/room/room-visibility-badge"
+import { formatLateJoinPolicyParts } from "@/lib/room-join-policy"
+import { isPrivateRoom } from "@/lib/room-visibility"
+import {
+  liveRoomCardGlowClassName,
+  lobbyHeaderCardClassName,
+  lobbyStatCardClassName,
+} from "@/lib/room-card-surface"
 import { cn } from "@/lib/utils"
 import type { Room } from "@/lib/types"
 
@@ -19,11 +33,7 @@ type RoomLobbyHeroProps = {
   roomDescription?: string
 }
 
-const identityCardClassName =
-  "border border-border/60 bg-background shadow-2xl shadow-accent-blue/10 backdrop-blur-xl"
-
-const statsStripCardClassName =
-  "border border-border/60 bg-surface shadow-2xl shadow-accent-blue/10 backdrop-blur-xl"
+const lobbyNavButtonClassName = "h-auto rounded-full py-2.5 px-[22px] text-sm"
 
 const formatCompetitionDateParts = (iso: string) => {
   const date = new Date(iso)
@@ -73,61 +83,69 @@ const getStatusClassName = (status: RoomStatus) => {
   return "border-loss/30 bg-loss/10 text-loss hover:bg-loss/10"
 }
 
-type StatStripItemProps = {
-  label: string
-  children: ReactNode
-  showDivider?: boolean
+const getStatusDotClassName = (status: RoomStatus) => {
+  if (status === "active") {
+    return "bg-profit"
+  }
+
+  if (status === "upcoming") {
+    return "bg-accent-neon"
+  }
+
+  return "bg-loss"
 }
 
-const StatStripItem = ({ label, children, showDivider = false }: StatStripItemProps) => (
-  <div
-    className={cn(
-      "flex min-w-0 flex-1 flex-col gap-1 px-4 py-2.5 first:pl-4 last:pr-4 sm:px-5 sm:py-3",
-      showDivider && "sm:border-l sm:border-white/12",
-    )}
-  >
-    <span className="text-[9px] font-medium uppercase tracking-[0.14em] text-text-secondary/50">
-      {label}
-    </span>
-    {children}
+type LobbyStatCardProps = {
+  icon: LucideIcon
+  label: string
+  primary: ReactNode
+  secondary?: string
+}
+
+const LobbyStatCard = ({ icon: Icon, label, primary, secondary }: LobbyStatCardProps) => (
+  <div className={lobbyStatCardClassName}>
+    <div className={liveRoomCardGlowClassName} aria-hidden />
+    <div className="relative">
+      <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-text-secondary/55">
+        <Icon className="size-3.5 shrink-0" aria-hidden />
+        {label}
+      </div>
+      <div className="mt-2 text-lg font-semibold tabular-nums text-text-primary">{primary}</div>
+      {secondary ? (
+        <p className="mt-0.5 text-xs text-text-secondary/80">{secondary}</p>
+      ) : null}
+    </div>
   </div>
 )
 
 export const RoomLobbyHero = ({ room, status, roomDescription }: RoomLobbyHeroProps) => {
   const startDate = formatCompetitionDateParts(room.start_date)
   const endDate = formatCompetitionDateParts(room.end_date)
+  const joinPolicy = formatLateJoinPolicyParts(room)
   const showRoomCode = isPrivateRoom(room) && room.join_code
 
   return (
-    <header className="flex flex-col gap-1.5 sm:gap-2">
-      <div
-        className={cn(
-          "relative overflow-hidden rounded-3xl border-l-2 border-l-accent-neon",
-          identityCardClassName,
-        )}
-      >
-        <RoomHeroBackground />
-        <div
-          className="pointer-events-none absolute inset-0 bg-background/70"
-          aria-hidden
-        />
+    <header className="flex flex-col gap-4">
+      <div className={lobbyHeaderCardClassName}>
+        <div className={liveRoomCardGlowClassName} aria-hidden />
         <div className="relative flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:p-5">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className={getStatusClassName(status)}>
+              <Badge variant="outline" className={cn("gap-1.5", getStatusClassName(status))}>
+                <span
+                  className={cn("size-1.5 shrink-0 rounded-full", getStatusDotClassName(status))}
+                  aria-hidden
+                />
                 {getStatusLabel(status)}
               </Badge>
-              <Badge
-                variant="outline"
-                className="border-border/60 bg-background/35 text-text-secondary hover:bg-background/35"
-              >
-                {getRoomVisibilityLabel(room)}
-              </Badge>
+              <RoomVisibilityBadge room={room} />
             </div>
 
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{room.name}</h1>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              {room.name}
+            </h1>
             {roomDescription ? (
-              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-secondary/80 sm:text-base">
+              <p className="mt-1 max-w-2xl text-sm italic leading-relaxed text-text-secondary/55 sm:text-base">
                 {roomDescription}
               </p>
             ) : null}
@@ -140,7 +158,10 @@ export const RoomLobbyHero = ({ room, status, roomDescription }: RoomLobbyHeroPr
             <Button
               asChild
               variant="outline"
-              className="h-10 rounded-full border-border/70 bg-background/35 px-4 text-text-primary shadow-lg shadow-accent-blue/5 backdrop-blur transition-colors hover:border-accent-neon/45 hover:bg-surface-elevated hover:text-white dark:bg-background/35 dark:hover:bg-surface-elevated"
+              className={cn(
+                lobbyNavButtonClassName,
+                "border-border/70 bg-background/35 text-text-primary shadow-lg shadow-accent-blue/5 backdrop-blur transition-colors hover:border-accent-neon/45 hover:bg-surface-elevated hover:text-white dark:bg-background/35 dark:hover:bg-surface-elevated",
+              )}
             >
               <Link href="/dashboard">
                 <BarChart3 className="size-4" aria-hidden />
@@ -149,11 +170,14 @@ export const RoomLobbyHero = ({ room, status, roomDescription }: RoomLobbyHeroPr
             </Button>
             <Button
               asChild
-              className="h-10 rounded-full bg-gradient-to-r from-accent-blue to-accent-neon px-4 font-semibold text-background shadow-lg shadow-accent-blue/25 transition-transform hover:translate-y-[-1px] hover:shadow-accent-blue/35"
+              className={cn(
+                lobbyNavButtonClassName,
+                "bg-gradient-to-r from-accent-blue to-accent-neon font-semibold text-background shadow-lg shadow-accent-blue/25 transition-transform hover:translate-y-[-1px] hover:shadow-accent-blue/35",
+              )}
             >
               <Link href={`/room/${room.id}/trade`}>
-                <DoorOpen className="size-4" aria-hidden />
-                Trading Terminal
+                <CandlestickChart className="size-4" aria-hidden />
+                Trade
                 <ArrowUpRight className="size-4" aria-hidden />
               </Link>
             </Button>
@@ -161,43 +185,53 @@ export const RoomLobbyHero = ({ room, status, roomDescription }: RoomLobbyHeroPr
         </div>
       </div>
 
-      <div className={cn("overflow-hidden rounded-3xl py-0.5 sm:py-0", statsStripCardClassName)}>
-        <div className="flex flex-col divide-y divide-white/12 sm:flex-row sm:divide-y-0">
-          <StatStripItem label="Starting balance">
-            <span className="font-mono text-sm font-semibold tabular-nums text-text-primary">
-              {formatWholeUsd(room.starting_balance)}
-            </span>
-          </StatStripItem>
+      <div
+        className={cn(
+          "grid gap-3 sm:grid-cols-2",
+          showRoomCode ? "xl:grid-cols-5" : "xl:grid-cols-4",
+        )}
+      >
+        <LobbyStatCard
+          icon={Wallet}
+          label="Starting balance"
+          primary={formatUsdRounded(room.starting_balance)}
+          secondary="USD"
+        />
 
-          {showRoomCode ? (
-            <StatStripItem label="Room code" showDivider>
-              <div className="flex items-center gap-1">
-                <span className="font-mono text-sm font-semibold tracking-wide tabular-nums text-text-primary">
-                  {room.join_code}
-                </span>
+        {showRoomCode ? (
+          <LobbyStatCard
+            icon={Key}
+            label="Room code"
+            primary={
+              <div className="flex items-center gap-1 font-mono text-lg tracking-wide">
+                {room.join_code}
                 <CopyRoomCodeButton code={room.join_code!} />
               </div>
-            </StatStripItem>
-          ) : null}
+            }
+            secondary="Private room"
+          />
+        ) : null}
 
-          <StatStripItem label="Start date" showDivider>
-            <span className="font-mono text-sm tabular-nums text-text-primary">{startDate.date}</span>
-            {startDate.time ? (
-              <span className="text-xs text-text-secondary">{startDate.time}</span>
-            ) : null}
-          </StatStripItem>
+        <LobbyStatCard
+          icon={Calendar}
+          label="Start date"
+          primary={startDate.date}
+          secondary={startDate.time || undefined}
+        />
 
-          <StatStripItem label="End date" showDivider>
-            <span className="font-mono text-sm tabular-nums text-text-primary">{endDate.date}</span>
-            {endDate.time ? (
-              <span className="text-xs text-text-secondary">{endDate.time}</span>
-            ) : null}
-          </StatStripItem>
+        <LobbyStatCard
+          icon={Calendar}
+          label="End date"
+          primary={endDate.date}
+          secondary={endDate.time || undefined}
+        />
 
-          <StatStripItem label="Join policy" showDivider>
-            <span className="text-sm text-text-primary">{formatLateJoinPolicy(room)}</span>
-          </StatStripItem>
-        </div>
+        <LobbyStatCard
+          icon={UserPlus}
+          label="Join policy"
+          primary={joinPolicy.primary}
+          secondary={joinPolicy.secondary || undefined}
+        />
       </div>
     </header>
   )

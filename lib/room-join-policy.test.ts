@@ -1,5 +1,6 @@
 import {
   formatLateJoinPolicy,
+  formatLateJoinPolicyParts,
   getRoomJoinCutoff,
   isRoomJoinOpen,
 } from "@/lib/room-join-policy"
@@ -69,9 +70,39 @@ describe("isRoomJoinOpen", () => {
   })
 })
 
+describe("formatLateJoinPolicyParts", () => {
+  it("formats open until end policy", () => {
+    expect(formatLateJoinPolicyParts(baseRoom)).toEqual({
+      primary: "Late joins allowed",
+      secondary: "until end",
+    })
+  })
+
+  it("formats no late joiners policy", () => {
+    expect(formatLateJoinPolicyParts({ ...baseRoom, late_join_hours: 0 })).toEqual({
+      primary: "No late joiners",
+      secondary: "Join before start",
+    })
+  })
+
+  it("formats hour window policy", () => {
+    expect(formatLateJoinPolicyParts({ ...baseRoom, late_join_hours: 48 })).toEqual({
+      primary: "Late joins allowed",
+      secondary: "within 48 hours of start",
+    })
+  })
+
+  it("formats singular hour policy", () => {
+    expect(formatLateJoinPolicyParts({ ...baseRoom, late_join_hours: 1 })).toEqual({
+      primary: "Late joins allowed",
+      secondary: "within 1 hour of start",
+    })
+  })
+})
+
 describe("formatLateJoinPolicy", () => {
   it("formats open until end policy", () => {
-    expect(formatLateJoinPolicy(baseRoom)).toBe("Open until competition ends")
+    expect(formatLateJoinPolicy(baseRoom)).toBe("Late joins allowed — until end")
   })
 
   it("formats no late joiners policy", () => {

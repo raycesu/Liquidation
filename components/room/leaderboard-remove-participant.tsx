@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { LeaderboardHostBadge } from "@/components/room/leaderboard-host-badge"
 import type { ActionResult } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { UserMinusIcon } from "lucide-react"
@@ -147,6 +148,7 @@ type LeaderboardTraderNameCellProps = {
   userId: string
   avatarUrl?: string | null
   canRemove: boolean
+  isHost?: boolean
 }
 
 export const LeaderboardTraderNameCell = ({
@@ -154,10 +156,11 @@ export const LeaderboardTraderNameCell = ({
   userId,
   avatarUrl,
   canRemove,
+  isHost = false,
 }: LeaderboardTraderNameCellProps) => {
   return (
     <div className="group/trader flex items-center gap-3">
-      <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-accent-neon/20 bg-gradient-to-br from-accent-blue/40 via-surface-elevated to-accent-neon/20 ring-1 ring-white/5">
+      <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-border/60 bg-surface-elevated">
         {avatarUrl ? (
           <Image
             src={avatarUrl}
@@ -175,6 +178,7 @@ export const LeaderboardTraderNameCell = ({
       </div>
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         <p className="truncate font-medium text-text-primary">{username}</p>
+        {isHost ? <LeaderboardHostBadge /> : null}
         {canRemove ? <LeaderboardRemoveIconButton userId={userId} username={username} /> : null}
       </div>
     </div>

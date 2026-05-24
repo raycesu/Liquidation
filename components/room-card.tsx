@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { openLobbyButtonClassName } from "@/lib/dashboard-nav-triggers"
 import { formatWholeUsd } from "@/lib/format"
+import { liveRoomCardGlowClassName } from "@/lib/room-card-surface"
 import { getCompetitionPhase } from "@/lib/room-competition-status"
 import type { Room } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -69,10 +70,7 @@ export const RoomCard = ({ room, variant = "member" }: RoomCardProps) => {
       )}
     >
       {isLiveCard ? (
-        <div
-          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(circle_at_0%_0%,rgb(16_199_255/0.14),transparent_42%),radial-gradient(circle_at_100%_0%,rgb(16_199_255/0.14),transparent_42%)]"
-          aria-hidden
-        />
+        <div className={liveRoomCardGlowClassName} aria-hidden />
       ) : null}
       <CardHeader className="relative space-y-3 pb-2">
         <div className="flex items-start justify-between gap-3">
