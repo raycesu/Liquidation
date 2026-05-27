@@ -6,6 +6,7 @@ import {
   placementRankForParticipant,
   scoreParticipantsByTotalPnl,
 } from "@/lib/participant-pnl"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import { fetchMarketPrices } from "@/lib/pricing"
 import type {
   Position,
@@ -138,12 +139,12 @@ const buildOpenMarginByParticipant = (openRows: OpenPositionRow[]) => {
 export const loadProfileDashboardData = async (userId: string): Promise<ProfileDashboardData> => {
   const sql = getSql()
 
-  const myRows = (await sql`
+  const myRowsRaw = (await sql`
     select
       rp.id::text,
       rp.room_id::text,
       rp.user_id,
-      rp.available_margin::float8 as available_margin,
+      rp.available_margin::text as available_margin,
       json_build_object(
         'id', r.id::text,
         'creator_id', r.creator_id,
@@ -163,7 +164,12 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     join rooms r on r.id = rp.room_id
     where rp.user_id = ${userId}
     order by r.created_at desc
-  `) as ParticipantRow[]
+  `) as (Omit<ParticipantRow, "available_margin"> & { available_margin: string })[]
+
+  const myRows = myRowsRaw.map((row) => ({
+    ...row,
+    available_margin: floorToUsdCents(toDecimal(row.available_margin)).toNumber(),
+  })) as ParticipantRow[]
 
   if (myRows.length === 0) {
     return {
@@ -202,7 +208,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
           rp.id::text,
           rp.room_id::text,
           rp.user_id,
-          rp.available_margin::float8 as available_margin
+          rp.available_margin::text as available_margin
         from room_participants rp
         where exists (
           select 1

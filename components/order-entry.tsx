@@ -17,10 +17,10 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { formatNumber, formatUsd } from "@/lib/format"
+import { floorToUsdCents, hasSufficientMarginUsd, requiredMarginUsd, toDecimal } from "@/lib/margin-utils"
 import { getMarket, getMaxLeverage } from "@/lib/markets"
 import {
   calculateLiquidationPriceFromMargin,
-  calculateRequiredMargin,
   computeOpenPositionMargin,
 } from "@/lib/perpetuals"
 import { computeTradeFee } from "@/lib/trading-fees"
@@ -119,7 +119,7 @@ export const OrderEntry = ({
       return 0
     }
 
-    return calculateRequiredMargin(numericSize, leverage)
+    return requiredMarginUsd(numericSize, leverage).toNumber()
   }, [leverage, numericSize])
 
   const estimatedTradeFee = useMemo(() => {
@@ -197,9 +197,9 @@ export const OrderEntry = ({
 
   const handleSizePercentChange = (percent: number) => {
     setSizePercent(percent)
-    const buyingPower = availableMargin * leverage
-    const target = (buyingPower * percent) / 100
-    setSizeUsd(target.toFixed(2))
+    const maxSizeUsd = floorToUsdCents(toDecimal(availableMargin).mul(leverage))
+    const nextSizeUsd = floorToUsdCents(maxSizeUsd.mul(percent).div(100))
+    setSizeUsd(nextSizeUsd.toFixed(2))
   }
 
   const handleTpPriceChange = (value: string) => {
@@ -287,14 +287,14 @@ export const OrderEntry = ({
       return
     }
 
-    if (orderType === "MARKET" && availableMargin < requiredMargin) {
+    if (orderType === "MARKET" && !hasSufficientMarginUsd(availableMargin, requiredMargin)) {
       setInlineError("Insufficient margin.")
       submitInFlightRef.current = false
       setIsSubmitting(false)
       return
     }
 
-    if (orderType === "LIMIT" && availableMargin < requiredMargin) {
+    if (orderType === "LIMIT" && !hasSufficientMarginUsd(availableMargin, requiredMargin)) {
       setInlineError("Insufficient margin.")
       submitInFlightRef.current = false
       setIsSubmitting(false)

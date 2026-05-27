@@ -3,6 +3,7 @@ import { z } from "zod"
 import { getSql } from "@/lib/db"
 import { isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrices } from "@/lib/pricing"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import { isRoomSettled, roomNeedsSettlement } from "@/lib/room-competition-status"
 import { computeManualCloseEconomics } from "@/lib/trading-engine/close-position"
 import { getTradeFeeForFill } from "@/lib/trading-fees"
@@ -17,7 +18,7 @@ export type SettleRoomResult = {
 type SettlementPosition = Position & {
   room_participants: {
     id: string
-    available_margin: number
+    available_margin: string
   } | null
 }
 
@@ -82,7 +83,7 @@ const fetchOpenPositionsForSettlement = async (roomId: string) => {
       p.closed_at::text,
       json_build_object(
         'id', rp.id::text,
-        'available_margin', rp.available_margin::float8
+        'available_margin', rp.available_margin::text
       ) as room_participants
     from positions p
     join room_participants rp on rp.id = p.participant_id
@@ -183,13 +184,13 @@ const closeAllOpenPositionsForRoom = async (
   const marginByParticipant = new Map<string, number>()
 
   const participantRows = (await sql`
-    select id::text, available_margin::float8 as available_margin
+    select id::text, available_margin::text as available_margin
     from room_participants
     where room_id = ${roomId}
-  `) as { id: string; available_margin: number }[]
+  `) as { id: string; available_margin: string }[]
 
   participantRows.forEach((row) => {
-    marginByParticipant.set(row.id, row.available_margin)
+    marginByParticipant.set(row.id, floorToUsdCents(toDecimal(row.available_margin)).toNumber())
   })
 
   for (const position of positions) {
@@ -203,7 +204,11 @@ const closeAllOpenPositionsForRoom = async (
       continue
     }
 
-    const availableMargin = marginByParticipant.get(participantId) ?? position.room_participants?.available_margin ?? 0
+    const availableMargin =
+      marginByParticipant.get(participantId) ??
+      (position.room_participants
+        ? floorToUsdCents(toDecimal(position.room_participants.available_margin)).toNumber()
+        : 0)
     const closeResult = await closePositionAtSettlement(position, livePrice, availableMargin)
 
     if (!closeResult) {

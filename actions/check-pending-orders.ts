@@ -5,6 +5,7 @@ import { runOrderEngineForRoom } from "@/lib/trading-engine/run-order-engine"
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql, withUserContext } from "@/lib/db"
 import { releaseEnginePoll, tryAcquireEnginePoll } from "@/lib/engine-poll-throttle"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import type { ActionResult, Position, Trade } from "@/lib/types"
 
 import type { LinkedBracketTrigger } from "@/lib/trading-engine/types"
@@ -83,11 +84,11 @@ export const checkPendingOrders = async ({
       }
 
       const marginRows = (await sql`
-        select available_margin::float8 as available_margin
+        select available_margin::text as available_margin
         from room_participants
         where id = ${participant.id}
         limit 1
-      `) as { available_margin: number }[]
+      `) as { available_margin: string }[]
 
       return {
         ok: true,
@@ -97,7 +98,10 @@ export const checkPendingOrders = async ({
           newPositions: engineResult.data.newPositions,
           closedPositionIds: engineResult.data.closedPositionIds,
           trades: engineResult.data.trades,
-          availableMargin: marginRows[0]?.available_margin ?? null,
+          availableMargin:
+            marginRows[0]?.available_margin != null
+              ? floorToUsdCents(toDecimal(marginRows[0].available_margin)).toNumber()
+              : null,
           skippedSymbols: engineResult.data.skippedSymbols,
           skippedOrderIds: engineResult.data.skippedOrderIds,
           linkedBracketTriggers: engineResult.data.linkedBracketTriggers,

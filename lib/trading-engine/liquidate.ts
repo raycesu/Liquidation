@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache"
 import { getSql } from "@/lib/db"
 import { fetchMarketPrices } from "@/lib/pricing"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import {
   computeLiquidationRealizedPnl,
   getCloseTradeDirection,
@@ -13,7 +14,7 @@ type LiquidationPosition = Position & {
   room_participants: {
     id: string
     room_id: string
-    available_margin: number
+    available_margin: string
   } | null
 }
 
@@ -123,7 +124,7 @@ const fetchOpenPositionsForRoom = async (roomId: string) => {
       json_build_object(
         'id', rp.id::text,
         'room_id', rp.room_id::text,
-        'available_margin', rp.available_margin::float8
+        'available_margin', rp.available_margin::text
       ) as room_participants
     from positions p
     join room_participants rp on rp.id = p.participant_id
@@ -152,7 +153,7 @@ const fetchOpenPositionsForParticipant = async (roomId: string, participantId: s
       json_build_object(
         'id', rp.id::text,
         'room_id', rp.room_id::text,
-        'available_margin', rp.available_margin::float8
+        'available_margin', rp.available_margin::text
       ) as room_participants
     from positions p
     join room_participants rp on rp.id = p.participant_id
@@ -184,6 +185,14 @@ export const liquidateParticipantPositions = async (
   }
 
   return { ok: true, data: result }
+}
+
+export const getParticipantAvailableMarginFromLiquidationRow = (row: LiquidationPosition) => {
+  if (!row.room_participants) {
+    return 0
+  }
+
+  return floorToUsdCents(toDecimal(row.room_participants.available_margin)).toNumber()
 }
 
 export const runLiquidationEngineForRoom = async (

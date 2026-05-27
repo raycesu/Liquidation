@@ -6,7 +6,7 @@ import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
 import { getMaxLeverage, isSupportedSymbol } from "@/lib/markets"
 import { getSql, withUserContext } from "@/lib/db"
-import { calculateRequiredMargin } from "@/lib/perpetuals"
+import { floorToUsdCents, formatUsdFixed, hasSufficientMarginUsd, requiredMarginUsd, toDecimal } from "@/lib/margin-utils"
 import { getTriggerSide, validateTriggerPrices } from "@/lib/trading-rules"
 import type { ActionResult, PendingOrder, RoomParticipant } from "@/lib/types"
 
@@ -91,9 +91,10 @@ export const placeLimitOrder = async (
     return { ok: false, error: triggerValidationError }
   }
 
-  const requiredMargin = calculateRequiredMargin(parsed.data.size, parsed.data.leverage)
+  const requiredMarginDecimal = requiredMarginUsd(parsed.data.size, parsed.data.leverage)
+  const requiredMargin = requiredMarginDecimal.toNumber()
 
-  if (participant.available_margin < requiredMargin) {
+  if (!hasSufficientMarginUsd(participant.available_margin, requiredMargin)) {
     return { ok: false, error: "Insufficient margin." }
   }
 
@@ -101,18 +102,18 @@ export const placeLimitOrder = async (
     const sql = getSql()
     const marginRows = (await sql`
       update room_participants
-      set available_margin = available_margin - ${requiredMargin}
+      set available_margin = available_margin - ${formatUsdFixed(requiredMarginDecimal)}
       where id = ${participant.id}
-        and available_margin >= ${requiredMargin}
-      returning available_margin::float8 as available_margin
-    `) as Pick<RoomParticipant, "available_margin">[]
+        and available_margin >= ${formatUsdFixed(requiredMarginDecimal)}
+      returning available_margin::text as available_margin
+    `) as { available_margin: string }[]
     const marginRow = marginRows[0]
 
     if (!marginRow) {
       return { ok: false, error: "Insufficient margin." }
     }
 
-    const nextAvailableMargin = marginRow.available_margin
+    const nextAvailableMargin = floorToUsdCents(toDecimal(marginRow.available_margin)).toNumber()
 
     const orderRows = (await sql`
       insert into orders (
@@ -139,7 +140,7 @@ export const placeLimitOrder = async (
         ${parsed.data.leverage},
         ${parsed.data.limitPrice},
         'PENDING',
-        ${requiredMargin}
+        ${formatUsdFixed(requiredMarginDecimal)}
       )
       returning
         id::text,
@@ -163,7 +164,7 @@ export const placeLimitOrder = async (
     if (!order) {
       await sql`
         update room_participants
-        set available_margin = available_margin + ${requiredMargin}
+        set available_margin = available_margin + ${formatUsdFixed(requiredMarginDecimal)}
         where id = ${participant.id}
       `
       return { ok: false, error: "Unable to place limit order" }

@@ -1,6 +1,7 @@
 import { getCompetitionPhase, isRoomSettled } from "@/lib/room-competition-status"
 import { isRoomJoinOpen } from "@/lib/room-join-policy"
 import { getSql, withUserContext } from "@/lib/db"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import type { ActionResult, Room, RoomParticipant } from "@/lib/types"
 
 export const TRADING_CLOSED_MESSAGE = "Trading is only available while the competition is ongoing"
@@ -47,7 +48,7 @@ export const loadRoomForParticipant = async (
       rp.id::text,
       rp.room_id::text,
       rp.user_id,
-      rp.available_margin::float8 as available_margin,
+      rp.available_margin::text as available_margin,
       rp.created_at::text,
       json_build_object(
         'id', r.id::text,
@@ -69,7 +70,7 @@ export const loadRoomForParticipant = async (
     where rp.room_id = ${roomId}
       and rp.user_id = ${userId}
     limit 1
-  `) as (RoomParticipant & { room: Room | null })[]
+  `) as (Omit<RoomParticipant, "available_margin"> & { available_margin: string; room: Room | null })[]
   })
 
   const row = rows[0]
@@ -86,7 +87,7 @@ export const loadRoomForParticipant = async (
         id: row.id,
         room_id: row.room_id,
         user_id: row.user_id,
-        available_margin: row.available_margin,
+        available_margin: floorToUsdCents(toDecimal(row.available_margin)).toNumber(),
         created_at: row.created_at,
       },
     },

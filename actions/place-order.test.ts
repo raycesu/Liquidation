@@ -104,7 +104,7 @@ describe("placeOrder", () => {
       symbol: "BTCUSDT",
       side: "LONG",
       leverage: 5,
-      size: 0.01,
+      size: 100,
     })
 
     expect(result.ok).toBe(false)
@@ -112,5 +112,75 @@ describe("placeOrder", () => {
     if (!result.ok) {
       expect(result.error).toBe("Unable to fetch market price. Try again in a moment.")
     }
+  })
+
+  it("allows an order when available margin equals required margin at cents precision", async () => {
+    fetchMarketPriceMock.mockResolvedValue(100)
+    loadRoomForParticipantMock.mockResolvedValue({
+      ok: true,
+      data: {
+        room: {
+          id: "room-1",
+          start_date: "2020-01-01",
+          end_date: "2099-01-01",
+          is_active: true,
+        },
+        participant: {
+          id: "00000000-0000-4000-8000-000000000001",
+          room_id: "00000000-0000-4000-8000-000000000002",
+          user_id: "user-1",
+          available_margin: 1598.87,
+          created_at: "2026-01-01T00:00:00.000Z",
+        },
+      },
+    } as never)
+
+    const sqlMock = jest.fn()
+    sqlMock.mockResolvedValueOnce([{ available_margin: "0.00" }])
+    sqlMock.mockResolvedValueOnce([
+      {
+        id: "pos-1",
+        participant_id: "00000000-0000-4000-8000-000000000001",
+        symbol: "BTCUSDT",
+        side: "LONG",
+        leverage: 40,
+        size: 63954.95,
+        margin_allocated: 0.01,
+        entry_price: 100,
+        liquidation_price: 1,
+        is_open: true,
+        created_at: "2026-01-01T00:00:00.000Z",
+        closed_at: null,
+      },
+    ])
+    sqlMock.mockResolvedValueOnce([
+      {
+        id: "trade-1",
+        participant_id: "00000000-0000-4000-8000-000000000001",
+        position_id: "pos-1",
+        symbol: "BTCUSDT",
+        direction: "OPEN_LONG",
+        price: 100,
+        size: 63954.95,
+        trade_value: 63954.95,
+        realized_pnl: null,
+        fee: 0,
+        liquidity_role: "TAKER",
+        created_at: "2026-01-01T00:00:00.000Z",
+      },
+    ])
+
+    getSqlMock.mockReturnValue(sqlMock as never)
+
+    const result = await placeOrder({
+      participantId: "00000000-0000-4000-8000-000000000001",
+      roomId: "00000000-0000-4000-8000-000000000002",
+      symbol: "BTCUSDT",
+      side: "LONG",
+      leverage: 40,
+      size: 63954.95,
+    })
+
+    expect(result.ok).toBe(true)
   })
 })

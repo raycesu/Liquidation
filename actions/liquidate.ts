@@ -3,6 +3,7 @@
 import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql, withUserContext } from "@/lib/db"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import { liquidateParticipantPositions } from "@/lib/trading-engine/liquidate"
 import type { ActionResult } from "@/lib/types"
 
@@ -50,18 +51,21 @@ export const liquidateRoom = async (roomId: string): Promise<ActionResult<Liquid
     const userLiquidatedPositionIds = engineResult.data.liquidatedPositionIds
 
     const marginRows = (await sql`
-      select available_margin::float8 as available_margin
+      select available_margin::text as available_margin
       from room_participants
       where id = ${participant.id}
       limit 1
-    `) as { available_margin: number }[]
+    `) as { available_margin: string }[]
 
     return {
       ok: true,
       data: {
         liquidated: userLiquidatedPositionIds.length,
         liquidatedPositionIds: userLiquidatedPositionIds,
-        availableMargin: marginRows[0]?.available_margin ?? null,
+        availableMargin:
+          marginRows[0]?.available_margin != null
+            ? floorToUsdCents(toDecimal(marginRows[0].available_margin)).toNumber()
+            : null,
       },
     }
   })

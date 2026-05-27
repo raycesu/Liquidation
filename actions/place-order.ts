@@ -9,10 +9,16 @@ import { getMaxLeverage, isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrice } from "@/lib/pricing"
 import {
   calculateLiquidationPriceFromMargin,
-  calculateRequiredMargin,
   computeOpenPositionMargin,
   validatePositionMarginAfterFee,
 } from "@/lib/perpetuals"
+import {
+  floorToUsdCents,
+  formatUsdFixed,
+  hasSufficientMarginUsd,
+  requiredMarginUsd,
+  toDecimal,
+} from "@/lib/margin-utils"
 import { getTradeFeeForFill } from "@/lib/trading-fees"
 import { getTriggerSide } from "@/lib/trading-rules"
 import type {
@@ -93,7 +99,8 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
     return { ok: false, error: "Participant not found" }
   }
 
-  const initialMargin = calculateRequiredMargin(parsed.data.size, parsed.data.leverage)
+  const initialMarginDecimal = requiredMarginUsd(parsed.data.size, parsed.data.leverage)
+  const initialMargin = initialMarginDecimal.toNumber()
   const { fee: tradeFee, liquidityRole } = getTradeFeeForFill({
     notionalUsd: parsed.data.size,
     orderType: "MARKET",
@@ -105,7 +112,7 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
     return { ok: false, error: marginValidationError }
   }
 
-  if (participant.available_margin < initialMargin) {
+  if (!hasSufficientMarginUsd(participant.available_margin, initialMargin)) {
     return { ok: false, error: "Insufficient margin." }
   }
 
@@ -154,11 +161,11 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
   const sql = getSql()
   const marginRows = (await sql`
     update room_participants
-    set available_margin = available_margin - ${initialMargin}
+    set available_margin = available_margin - ${formatUsdFixed(initialMarginDecimal)}
     where id = ${participant.id}
-      and available_margin >= ${initialMargin}
-    returning available_margin::float8 as available_margin
-  `) as Pick<RoomParticipant, "available_margin">[]
+      and available_margin >= ${formatUsdFixed(initialMarginDecimal)}
+    returning available_margin::text as available_margin
+  `) as { available_margin: string }[]
   const marginRow = marginRows[0]
 
   if (!marginRow) {
@@ -212,7 +219,7 @@ export const placeOrder = async (input: PlaceOrderInput): Promise<ActionResult<P
     `
     return { ok: false, error: "Unable to place order" }
   }
-  const nextAvailableMargin = marginRow.available_margin
+  const nextAvailableMargin = floorToUsdCents(toDecimal(marginRow.available_margin)).toNumber()
 
   const tradeDirection = side === "LONG" ? "OPEN_LONG" : "OPEN_SHORT"
   const tradeRows = (await sql`

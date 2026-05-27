@@ -6,12 +6,13 @@ import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
 import { fetchMarketPrice } from "@/lib/pricing"
 import { getSql, withUserContext } from "@/lib/db"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import { computeManualCloseEconomics } from "@/lib/trading-engine/close-position"
 import { getTradeFeeForFill } from "@/lib/trading-fees"
 import type { ActionResult, Position, RoomParticipant, Trade } from "@/lib/types"
 
 type PositionWithParticipant = Position & {
-  room_participants: RoomParticipant | null
+  room_participants: (Omit<RoomParticipant, "available_margin"> & { available_margin: string }) | null
 }
 
 export type ClosePositionResult = {
@@ -77,7 +78,7 @@ export const closePosition = async ({
         'id', rp.id::text,
         'room_id', rp.room_id::text,
         'user_id', rp.user_id,
-        'available_margin', rp.available_margin::float8,
+        'available_margin', rp.available_margin::text,
         'created_at', rp.created_at::text
       ) as room_participants
     from positions p
@@ -118,7 +119,7 @@ export const closePosition = async ({
     side: position.side,
     size: position.size,
     marginAllocated: position.margin_allocated,
-    availableMargin: position.room_participants.available_margin,
+    availableMargin: floorToUsdCents(toDecimal(position.room_participants.available_margin)).toNumber(),
     fee: tradeFee,
   })
   const closedRows = (await sql`

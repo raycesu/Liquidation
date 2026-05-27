@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { TradingTerminal } from "@/components/trading-terminal"
 import { requireOnboardedUser } from "@/lib/auth"
 import { getSql } from "@/lib/db"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import { getCompetitionPhase } from "@/lib/room-competition-status"
 import type { PendingOrder, Position, Room, RoomParticipant, Trade } from "@/lib/types"
 
@@ -56,17 +57,21 @@ export default async function TradePage({ params }: TradePageProps) {
       id::text,
       room_id::text,
       user_id,
-      available_margin::float8 as available_margin,
+      available_margin::text as available_margin,
       created_at::text
     from room_participants
     where room_id = ${roomId}
       and user_id = ${user.id}
     limit 1
-  `) as RoomParticipant[]
-  const participant = participantRows[0]
+  `) as (Omit<RoomParticipant, "available_margin"> & { available_margin: string })[]
+  const participantRow = participantRows[0]
 
-  if (!participant) {
+  if (!participantRow) {
     redirect("/dashboard")
+  }
+  const participant: RoomParticipant = {
+    ...participantRow,
+    available_margin: floorToUsdCents(toDecimal(participantRow.available_margin)).toNumber(),
   }
 
   const positions = (await sql`

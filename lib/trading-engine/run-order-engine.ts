@@ -3,6 +3,7 @@ import { z } from "zod"
 import { isSupportedSymbol } from "@/lib/markets"
 import { fetchMarketPrices } from "@/lib/pricing"
 import { getSql } from "@/lib/db"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import {
   calculateLiquidationPriceFromMargin,
   computeOpenPositionMargin,
@@ -54,19 +55,19 @@ export const runOrderEngineForRoom = async (
   const participantMargins = new Map<string, number>()
   const marginRows = participantId
     ? ((await sql`
-        select id::text, available_margin::float8 as available_margin
+        select id::text, available_margin::text as available_margin
         from room_participants
         where room_id = ${roomId}
           and id = ${participantId}
-      `) as { id: string; available_margin: number }[])
+      `) as { id: string; available_margin: string }[])
     : ((await sql`
-        select id::text, available_margin::float8 as available_margin
+        select id::text, available_margin::text as available_margin
         from room_participants
         where room_id = ${roomId}
-      `) as { id: string; available_margin: number }[])
+      `) as { id: string; available_margin: string }[])
 
   for (const row of marginRows) {
-    participantMargins.set(row.id, row.available_margin)
+    participantMargins.set(row.id, floorToUsdCents(toDecimal(row.available_margin)).toNumber())
   }
 
   const orders = participantId

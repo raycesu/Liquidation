@@ -1,6 +1,7 @@
 import { paginateItems } from "@/lib/client-pagination"
 import { getSql } from "@/lib/db"
 import { buildUnrealizedPnlByParticipant, scoreParticipantsByTotalPnl } from "@/lib/participant-pnl"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import { fetchMarketPrices } from "@/lib/pricing"
 import type { ParticipantWithUser, Position } from "@/lib/types"
 
@@ -66,12 +67,12 @@ export const paginateRankedParticipants = (
 export const loadRoomParticipantsWithUsers = async (roomId: string) => {
   const sql = getSql()
 
-  return (await sql`
+  const rows = (await sql`
     select
       rp.id::text,
       rp.room_id::text,
       rp.user_id,
-      rp.available_margin::float8 as available_margin,
+      rp.available_margin::text as available_margin,
       rp.created_at::text,
       json_build_object(
         'id', u.id,
@@ -82,7 +83,12 @@ export const loadRoomParticipantsWithUsers = async (roomId: string) => {
     join users u on u.id = rp.user_id
     where rp.room_id = ${roomId}
     order by rp.created_at asc
-  `) as ParticipantWithUser[]
+  `) as (Omit<ParticipantWithUser, "available_margin"> & { available_margin: string })[]
+
+  return rows.map((row) => ({
+    ...row,
+    available_margin: floorToUsdCents(toDecimal(row.available_margin)).toNumber(),
+  })) as ParticipantWithUser[]
 }
 
 export const getRoomLeaderboard = async (roomId: string, page?: string | string[]) => {

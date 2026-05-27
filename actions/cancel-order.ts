@@ -5,10 +5,11 @@ import { z } from "zod"
 import { requireOnboardedUser } from "@/lib/auth"
 import { assertRoomTradingOpen, loadRoomForParticipant } from "@/lib/competition-guards"
 import { getSql, withUserContext } from "@/lib/db"
+import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import type { ActionResult, PendingOrder, RoomParticipant } from "@/lib/types"
 
 type OrderWithParticipant = PendingOrder & {
-  room_participants: RoomParticipant | null
+  room_participants: (Omit<RoomParticipant, "available_margin"> & { available_margin: string }) | null
 }
 
 export type CancelOrderResult = {
@@ -76,7 +77,7 @@ export const cancelOrder = async ({
         'id', rp.id::text,
         'room_id', rp.room_id::text,
         'user_id', rp.user_id,
-        'available_margin', rp.available_margin::float8,
+        'available_margin', rp.available_margin::text,
         'created_at', rp.created_at::text
       ) as room_participants
     from orders o
@@ -124,10 +125,11 @@ export const cancelOrder = async ({
     cancelledBracketOrderIds = cancelledBracketRows.map((row) => row.id)
   }
 
-  let nextAvailableMargin = order.room_participants.available_margin
+  let nextAvailableMargin = floorToUsdCents(toDecimal(order.room_participants.available_margin)).toNumber()
 
   if (order.margin_reserved > 0) {
-    nextAvailableMargin = order.room_participants.available_margin + order.margin_reserved
+    nextAvailableMargin =
+      floorToUsdCents(toDecimal(order.room_participants.available_margin)).toNumber() + order.margin_reserved
     await sql`
       update room_participants
       set available_margin = ${nextAvailableMargin}
