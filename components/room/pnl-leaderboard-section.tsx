@@ -12,7 +12,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatPercent, formatUsd } from "@/lib/format"
-import { computePnlPercentFromTotalPnl } from "@/lib/participant-pnl"
+import {
+  computeDisplayedPnlPercentFromTotalPnl,
+  computeDisplayedTotalPnlFromTotalPnl,
+} from "@/lib/participant-pnl"
 import type { LeaderboardPageData } from "@/lib/room-leaderboard"
 import { lobbyLeaderboardCardClassName } from "@/lib/room-card-surface"
 import { cn } from "@/lib/utils"
@@ -132,9 +135,18 @@ export const PnlLeaderboardSection = ({
                   const username = participant.users?.username ?? "Anonymous"
                   const globalRank = pageStartIndex + index + 1
                   const avatarUrl = participant.users?.image_url
-                  const pnlPercent = computePnlPercentFromTotalPnl(participant.totalPnl, startingBalance)
+                  const pnlPercent = computeDisplayedPnlPercentFromTotalPnl(
+                    participant.totalPnl,
+                    startingBalance,
+                    participant.isAccountBusted,
+                  )
+                  const displayedTotalPnl = computeDisplayedTotalPnlFromTotalPnl(
+                    participant.totalPnl,
+                    startingBalance,
+                    participant.isAccountBusted,
+                  )
                   const signPrefix =
-                    participant.totalPnl > 0 ? "+" : participant.totalPnl < 0 ? "" : ""
+                    displayedTotalPnl > 0 ? "+" : displayedTotalPnl < 0 ? "" : ""
                   const isHost = Boolean(creatorUserId && participant.user_id === creatorUserId)
 
                   return (
@@ -191,12 +203,12 @@ export const PnlLeaderboardSection = ({
                         <div
                           className={cn(
                             "flex flex-col gap-0.5 font-mono tabular-nums",
-                            getPnlClassName(participant.totalPnl),
+                            getPnlClassName(displayedTotalPnl),
                           )}
                         >
                           <span className="text-sm font-semibold">
                             {signPrefix}
-                            {formatUsd(participant.totalPnl)}
+                            {formatUsd(displayedTotalPnl)}
                           </span>
                           <span className="text-xs font-medium">
                             {signPrefix}

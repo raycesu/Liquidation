@@ -17,6 +17,7 @@ const rankedParticipant = (id: string, totalPnl: number): RankedParticipant => (
   closedTrades: 0,
   winningTrades: 0,
   winRate: null,
+  isAccountBusted: false,
 })
 
 describe("parseLeaderboardPage", () => {

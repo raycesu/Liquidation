@@ -14,8 +14,16 @@ export const AccountWipeoutsDisplay = ({ wipeouts }: AccountWipeoutsDisplayProps
 
   return (
     <div className="flex max-w-[min(100%,14rem)] flex-wrap items-center justify-end gap-1 sm:max-w-none">
-      {wipeouts.map((wipeout) => {
+      {wipeouts.map((wipeout, wipeoutIndex) => {
         const tooltip = `${formatProfileDate(wipeout.wipedAtIso)} · ${wipeout.roomName}`
+        const isFirstWipeout = wipeoutIndex === 0
+        const isLastWipeout = wipeoutIndex === wipeouts.length - 1
+
+        const tooltipPositionClassName = isFirstWipeout
+          ? "right-0 translate-x-0 text-right"
+          : isLastWipeout
+            ? "left-0 translate-x-0 text-left"
+            : "left-1/2 -translate-x-1/2 text-center"
 
         return (
           <span
@@ -32,7 +40,7 @@ export const AccountWipeoutsDisplay = ({ wipeouts }: AccountWipeoutsDisplayProps
             </span>
             <span
               role="tooltip"
-              className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[220px] -translate-x-1/2 rounded-lg border border-white/12 bg-[#0a1627]/95 px-2.5 py-1.5 text-center text-xs font-medium text-text-primary opacity-0 shadow-lg backdrop-blur-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+              className={`pointer-events-none absolute bottom-full z-20 mb-2 w-max max-w-[220px] rounded-lg border border-white/12 bg-[#0a1627]/95 px-2.5 py-1.5 text-xs font-medium text-text-primary opacity-0 shadow-lg backdrop-blur-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 ${tooltipPositionClassName}`}
             >
               {tooltip}
             </span>

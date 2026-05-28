@@ -1,7 +1,9 @@
 import { getSql } from "@/lib/db"
+import { buildParticipantNetPnlStats } from "@/lib/net-pnl"
 import { computeParticipantEquity } from "@/lib/participant-equity"
 import {
   buildUnrealizedPnlByParticipant,
+  computeDisplayedPnlPercentFromTotalPnl,
   computePnlPercentFromTotalPnl,
   placementRankForParticipant,
   scoreParticipantsByTotalPnl,
@@ -73,7 +75,7 @@ type LastTradeRow = {
 
 type RealizedPnlRow = {
   participant_id: string
-  realized_pnl: number
+  trade_pnl: number
   closed_trade_count: string | number
 }
 
@@ -245,7 +247,7 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
       sql`
         select
           t.participant_id::text,
-          coalesce(sum(t.realized_pnl), 0)::float8 as realized_pnl,
+          coalesce(sum(coalesce(t.realized_pnl, 0) - coalesce(t.fee, 0)), 0)::float8 as trade_pnl,
           count(*)::int as closed_trade_count
         from trades t
         join room_participants rp on rp.id = t.participant_id
@@ -352,20 +354,20 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
 
   const openMarginByParticipant = buildOpenMarginByParticipant(openPositions)
   const unrealizedByParticipant = buildUnrealizedPnlByParticipant(openPositions, prices)
-
-  const fundingByParticipant = new Map(fundingPnlRows.map((row) => [row.participant_id, row.funding_pnl]))
-  const realizedByParticipant = new Map<string, number>()
-  const closedTradeCountByParticipant = new Map<string, number>()
-  realizedPnlRows.forEach((row) => {
-    const fundingPnl = fundingByParticipant.get(row.participant_id) ?? 0
-    realizedByParticipant.set(row.participant_id, row.realized_pnl + fundingPnl)
-    closedTradeCountByParticipant.set(row.participant_id, parseCount(row.closed_trade_count))
-  })
-  fundingPnlRows.forEach((row) => {
-    if (!realizedByParticipant.has(row.participant_id)) {
-      realizedByParticipant.set(row.participant_id, row.funding_pnl)
-    }
-  })
+  const participantIds = allRoomParticipants.map((participant) => participant.id)
+  const netStatsByParticipant = buildParticipantNetPnlStats(participantIds, realizedPnlRows, fundingPnlRows)
+  const realizedByParticipant = new Map(
+    participantIds.map((participantId) => [
+      participantId,
+      netStatsByParticipant.get(participantId)?.realizedPnl ?? 0,
+    ]),
+  )
+  const closedTradeCountByParticipant = new Map(
+    participantIds.map((participantId) => [
+      participantId,
+      netStatsByParticipant.get(participantId)?.closedTradeCount ?? 0,
+    ]),
+  )
 
   const openByParticipant = new Map<string, boolean>()
   openPositions.forEach((p) => {
@@ -400,23 +402,27 @@ export const loadProfileDashboardData = async (userId: string): Promise<ProfileD
     const placementRank = placementRankForParticipant(ranked, row.id)
     const mine = ranked.find((participant) => participant.id === row.id)
     const totalPnl = mine?.totalPnl ?? 0
-    const pnlPercent = computePnlPercentFromTotalPnl(totalPnl, room.starting_balance)
-    pnlPercents.push(pnlPercent)
-
     const displayEquity = computeParticipantEquity(
       row.available_margin,
       openMarginByParticipant.get(row.id) ?? 0,
       unrealizedByParticipant.get(row.id) ?? 0,
     )
     const hasOpen = openByParticipant.has(row.id)
+    const accountBusted = isAccountBusted(displayEquity, hasOpen)
 
-    if (isAccountBusted(displayEquity, hasOpen)) {
+    if (accountBusted) {
       wipeouts.push({
         roomId: room.id,
         roomName: room.name,
         wipedAtIso: lastTradeByParticipant.get(row.id) ?? room.end_date,
       })
     }
+    const pnlPercent = computeDisplayedPnlPercentFromTotalPnl(
+      totalPnl,
+      room.starting_balance,
+      accountBusted,
+    )
+    pnlPercents.push(pnlPercent)
 
     competitionRows.push({
       room,

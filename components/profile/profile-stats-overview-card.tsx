@@ -52,7 +52,7 @@ export const ProfileStatsOverviewCard = ({ summary, topSymbols }: ProfileStatsOv
   return (
     <div
       className={cn(
-        "relative h-full overflow-hidden rounded-2xl border border-white/10",
+        "relative h-full overflow-visible rounded-2xl border border-white/10",
         "bg-[#050a14] bg-[radial-gradient(ellipse_80%_60%_at_100%_0%,rgb(17_201_255/0.22),transparent_55%),radial-gradient(ellipse_50%_40%_at_0%_100%,rgb(10_140_255/0.12),transparent_50%)]",
         "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-sm",
       )}

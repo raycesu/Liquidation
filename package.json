@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "markets:refresh": "tsx scripts/fetch-hl-markets.ts"
+    "markets:refresh": "tsx scripts/fetch-hl-markets.ts",
+    "pnl:backfill": "tsx scripts/backfill-leaderboard-net-pnl.ts"
   },
   "keywords": [],
   "author": "",

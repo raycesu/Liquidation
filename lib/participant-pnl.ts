@@ -53,6 +53,30 @@ export const computePnlPercentFromTotalPnl = (totalPnl: number, startingBalance:
   return (totalPnl / startingBalance) * 100
 }
 
+export const computeDisplayedPnlPercentFromTotalPnl = (
+  totalPnl: number,
+  startingBalance: number,
+  isAccountBusted: boolean,
+) => {
+  if (isAccountBusted) {
+    return -100
+  }
+
+  return computePnlPercentFromTotalPnl(totalPnl, startingBalance)
+}
+
+export const computeDisplayedTotalPnlFromTotalPnl = (
+  totalPnl: number,
+  startingBalance: number,
+  isAccountBusted: boolean,
+) => {
+  if (isAccountBusted) {
+    return startingBalance > 0 ? -startingBalance : totalPnl
+  }
+
+  return totalPnl
+}
+
 export const compareByLeaderboardPnl = (a: ParticipantPnlScore, b: ParticipantPnlScore) =>
   b.totalPnl - a.totalPnl || b.available_margin - a.available_margin
 

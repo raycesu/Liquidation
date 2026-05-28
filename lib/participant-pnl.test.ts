@@ -1,4 +1,6 @@
 import {
+  computeDisplayedPnlPercentFromTotalPnl,
+  computeDisplayedTotalPnlFromTotalPnl,
   computePnlPercentFromTotalPnl,
   computeTotalPnl,
   placementRankForParticipant,
@@ -19,6 +21,27 @@ describe("computePnlPercentFromTotalPnl", () => {
 
   it("returns 0 when starting balance is not positive", () => {
     expect(computePnlPercentFromTotalPnl(500, 0)).toBe(0)
+  })
+})
+
+describe("computeDisplayedPnlPercentFromTotalPnl", () => {
+  it("clamps busted accounts to -100%", () => {
+    expect(computeDisplayedPnlPercentFromTotalPnl(-9400, 10_000, true)).toBe(-100)
+    expect(computeDisplayedPnlPercentFromTotalPnl(0, 10_000, true)).toBe(-100)
+  })
+
+  it("uses normal pnl percent for non-busted accounts", () => {
+    expect(computeDisplayedPnlPercentFromTotalPnl(-9400, 10_000, false)).toBeCloseTo(-94, 5)
+  })
+})
+
+describe("computeDisplayedTotalPnlFromTotalPnl", () => {
+  it("clamps busted accounts to full loss in dollars", () => {
+    expect(computeDisplayedTotalPnlFromTotalPnl(-96_002.25, 100_000, true)).toBe(-100_000)
+  })
+
+  it("preserves total pnl when account is not busted", () => {
+    expect(computeDisplayedTotalPnlFromTotalPnl(-96_002.25, 100_000, false)).toBe(-96_002.25)
   })
 })
 

@@ -1,5 +1,6 @@
 import { paginateItems } from "@/lib/client-pagination"
 import { getSql } from "@/lib/db"
+import { buildParticipantNetPnlStats } from "@/lib/net-pnl"
 import { buildUnrealizedPnlByParticipant, scoreParticipantsByTotalPnl } from "@/lib/participant-pnl"
 import { floorToUsdCents, toDecimal } from "@/lib/margin-utils"
 import { fetchMarketPrices } from "@/lib/pricing"
@@ -18,6 +19,7 @@ export type RankedParticipant = ParticipantWithUser & {
   closedTrades: number
   winningTrades: number
   winRate: number | null
+  isAccountBusted: boolean
 }
 
 export type LeaderboardPageData = {
@@ -32,10 +34,12 @@ type RoomPosition = Pick<Position, "participant_id" | "symbol" | "side" | "size"
 
 type TradeStatsRow = {
   participant_id: string
-  realized_pnl: number
-  closed_trades: number
-  winning_trades: number
+  trade_pnl: number
+  closed_trade_count: number
+  winning_trade_count: number
 }
+
+const EPS = 1e-6
 
 export const parseLeaderboardPage = (page: string | string[] | undefined) => {
   const value = Array.isArray(page) ? page[0] : page
@@ -116,9 +120,11 @@ export const getRankedParticipants = async (roomId: string, participants: Partic
     sql`
       select
         t.participant_id::text,
-        coalesce(sum(t.realized_pnl), 0)::float8 as realized_pnl,
-        count(*)::int as closed_trades,
-        (count(*) filter (where t.realized_pnl > 0))::int as winning_trades
+        coalesce(sum(coalesce(t.realized_pnl, 0) - coalesce(t.fee, 0)), 0)::float8 as trade_pnl,
+        count(*)::int as closed_trade_count,
+        (
+          count(*) filter (where (coalesce(t.realized_pnl, 0) - coalesce(t.fee, 0)) > 0)
+        )::int as winning_trade_count
       from trades t
       join room_participants rp on rp.id = t.participant_id
       where rp.room_id = ${roomId}
@@ -157,23 +163,27 @@ export const getRankedParticipants = async (roomId: string, participants: Partic
   const unrealizedByParticipant = lockRanking
     ? new Map<string, number>()
     : buildUnrealizedPnlByParticipant(roomPositions, prices)
-  const statsByParticipant = new Map(tradeStatsRows.map((row) => [row.participant_id, row]))
-  const fundingByParticipant = new Map(fundingStatsRows.map((row) => [row.participant_id, row.funding_pnl]))
-  const realizedByParticipant = new Map<string, number>()
-
-  participants.forEach((participant) => {
-    const tradeRealized = statsByParticipant.get(participant.id)?.realized_pnl ?? 0
-    const fundingRealized = fundingByParticipant.get(participant.id) ?? 0
-    realizedByParticipant.set(participant.id, tradeRealized + fundingRealized)
-  })
+  const netStatsByParticipant = buildParticipantNetPnlStats(
+    participants.map((participant) => participant.id),
+    tradeStatsRows,
+    fundingStatsRows,
+  )
+  const realizedByParticipant = new Map(
+    participants.map((participant) => [
+      participant.id,
+      netStatsByParticipant.get(participant.id)?.realizedPnl ?? 0,
+    ]),
+  )
+  const hasOpenPositions = new Set(roomPositions.map((position) => position.participant_id))
 
   const scored = scoreParticipantsByTotalPnl(participants, realizedByParticipant, unrealizedByParticipant)
 
   return scored.map((participant): RankedParticipant => {
-    const stats = statsByParticipant.get(participant.id)
-    const closedTrades = stats?.closed_trades ?? 0
-    const winningTrades = stats?.winning_trades ?? 0
+    const stats = netStatsByParticipant.get(participant.id)
+    const closedTrades = stats?.closedTradeCount ?? 0
+    const winningTrades = stats?.winningTradeCount ?? 0
     const winRate = closedTrades > 0 ? (winningTrades / closedTrades) * 100 : null
+    const isAccountBusted = !hasOpenPositions.has(participant.id) && participant.available_margin <= EPS
 
     return {
       ...participant,
@@ -183,6 +193,7 @@ export const getRankedParticipants = async (roomId: string, participants: Partic
       closedTrades,
       winningTrades,
       winRate,
+      isAccountBusted,
     }
   })
 }
