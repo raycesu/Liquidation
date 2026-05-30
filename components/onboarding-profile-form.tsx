@@ -35,8 +35,6 @@ export const OnboardingProfileForm = ({ avatarUrl, suggestedUsername }: Onboardi
     setUsernamePreview(event.target.value.toLowerCase())
   }
 
-  const hasPhoto = Boolean(avatarUrl)
-
   return (
     <form action={formAction} className="space-y-4">
       {!state.ok ? (
@@ -54,7 +52,7 @@ export const OnboardingProfileForm = ({ avatarUrl, suggestedUsername }: Onboardi
             "outline-none transition-opacity focus-visible:ring-3 focus-visible:ring-accent-neon/50",
           )}
         >
-          {hasPhoto ? (
+          {avatarUrl ? (
             <Image
               src={avatarUrl}
               alt="Profile avatar preview"
@@ -71,7 +69,7 @@ export const OnboardingProfileForm = ({ avatarUrl, suggestedUsername }: Onboardi
               {getInitials(usernamePreview || "tr")}
             </div>
           )}
-          {!hasPhoto ? (
+          {!avatarUrl ? (
             <span
               className="absolute right-0 bottom-0 flex size-7 items-center justify-center rounded-full border border-white/20 bg-accent-neon/90 text-accent-foreground shadow-sm"
               aria-hidden
