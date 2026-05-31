@@ -1,0 +1,86 @@
+.legal-termly-content [data-custom-class="body"],
+.legal-termly-content [data-custom-class="body"] * {
+  background: transparent !important;
+}
+
+.legal-termly-content [data-custom-class="title"],
+.legal-termly-content [data-custom-class="title"] * {
+  font-family: var(--font-geist-sans), Arial, sans-serif !important;
+  font-size: 1.625rem !important;
+  color: #0f172a !important;
+}
+
+.legal-termly-content [data-custom-class="subtitle"],
+.legal-termly-content [data-custom-class="subtitle"] * {
+  font-family: var(--font-geist-sans), Arial, sans-serif !important;
+  color: #64748b !important;
+  font-size: 0.875rem !important;
+}
+
+.legal-termly-content [data-custom-class="heading_1"],
+.legal-termly-content [data-custom-class="heading_1"] * {
+  font-family: var(--font-geist-sans), Arial, sans-serif !important;
+  font-size: 1.1875rem !important;
+  color: #0f172a !important;
+}
+
+.legal-termly-content [data-custom-class="heading_2"],
+.legal-termly-content [data-custom-class="heading_2"] * {
+  font-family: var(--font-geist-sans), Arial, sans-serif !important;
+  font-size: 1.0625rem !important;
+  color: #0f172a !important;
+}
+
+.legal-termly-content [data-custom-class="body_text"],
+.legal-termly-content [data-custom-class="body_text"] * {
+  color: #475569 !important;
+  font-size: 0.875rem !important;
+  font-family: var(--font-geist-sans), Arial, sans-serif !important;
+  line-height: 1.6 !important;
+}
+
+.legal-termly-content [data-custom-class="link"],
+.legal-termly-content [data-custom-class="link"] * {
+  color: #2563eb !important;
+  font-size: 0.875rem !important;
+  font-family: var(--font-geist-sans), Arial, sans-serif !important;
+  word-break: break-word !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.legal-termly-content ul {
+  list-style-type: square;
+  padding-left: 1.25rem;
+}
+
+.legal-termly-content ul > li > ul {
+  list-style-type: circle;
+}
+
+.legal-termly-content ul > li > ul > li > ul {
+  list-style-type: square;
+}
+
+.legal-termly-content ol li {
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+.legal-termly-content h1,
+.legal-termly-content h2,
+.legal-termly-content h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.legal-termly-content a:hover {
+  color: #1d4ed8 !important;
+}
+
+.legal-termly-content .termly-attribution {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.8125rem;
+  color: #64748b;
+}

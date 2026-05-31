@@ -9,6 +9,7 @@ import { AuthDivider } from "@/components/auth/auth-divider"
 import { AuthField } from "@/components/auth/auth-field"
 import { AuthGlassCard } from "@/components/auth/auth-glass-card"
 import { GoogleOAuthButton } from "@/components/auth/google-oauth-button"
+import { LegalConsentField } from "@/components/auth/legal-consent-field"
 import { Button } from "@/components/ui/button"
 import { getClerkErrorMessage } from "@/lib/clerk-auth-errors"
 import { getClerkOAuthCallbackUrl } from "@/lib/clerk-oauth"
@@ -32,9 +33,11 @@ export const SignUpForm = () => {
   const [password, setPassword] = useState("")
   const [verificationCode, setVerificationCode] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [hasAcceptedLegalTerms, setHasAcceptedLegalTerms] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
   const isSubmitting = fetchStatus === "fetching"
+  const isLegalConsentMissing = !hasAcceptedLegalTerms
 
   const handleTogglePasswordVisibility = () => {
     setShowPassword((current) => !current)
@@ -56,6 +59,11 @@ export const SignUpForm = () => {
   const handleSignUpSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setFormError(null)
+
+    if (!hasAcceptedLegalTerms) {
+      setFormError("You must agree to the Terms of Service and Privacy Policy to create an account.")
+      return
+    }
 
     const { error } = await signUp.password({
       emailAddress: email.trim(),
@@ -112,6 +120,11 @@ export const SignUpForm = () => {
 
   const handleGoogleSignUp = async () => {
     setFormError(null)
+
+    if (!hasAcceptedLegalTerms) {
+      setFormError("You must agree to the Terms of Service and Privacy Policy to create an account.")
+      return
+    }
 
     const { error } = await signUp.sso({
       strategy: "oauth_google",
@@ -235,10 +248,16 @@ export const SignUpForm = () => {
           }
         />
 
+        <LegalConsentField
+          checked={hasAcceptedLegalTerms}
+          onCheckedChange={setHasAcceptedLegalTerms}
+          disabled={isSubmitting}
+        />
+
         <Button
           type="submit"
-          disabled={isSubmitting}
-          className="h-12 w-full rounded-xl border border-[#b8ebff]/70 bg-[#ecf8ff] text-sm font-semibold text-[#03101f] shadow-[0_10px_24px_rgb(17_191_255/0.18)] hover:bg-white"
+          disabled={isSubmitting || isLegalConsentMissing}
+          className="h-12 w-full rounded-xl border border-[#b8ebff]/70 bg-[#ecf8ff] text-sm font-semibold text-[#03101f] shadow-[0_10px_24px_rgb(17_191_255/0.18)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting ? <Loader2 className="size-4 animate-spin" aria-hidden /> : "Create account"}
         </Button>
@@ -247,7 +266,11 @@ export const SignUpForm = () => {
       <AuthDivider label="Or sign up with" />
 
       <div className="flex justify-center">
-        <GoogleOAuthButton onClick={handleGoogleSignUp} disabled={isSubmitting} label="Continue with Google" />
+        <GoogleOAuthButton
+          onClick={handleGoogleSignUp}
+          disabled={isSubmitting || isLegalConsentMissing}
+          label="Continue with Google"
+        />
       </div>
 
       <p className="mt-6 text-center text-sm text-[#87abcf]">

@@ -2,6 +2,7 @@ import { ClerkProvider } from "@clerk/nextjs"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { DevWarningFilter } from "@/components/dev-warning-filter"
+import { SiteFooter } from "@/components/site-footer"
 import { Toaster } from "@/components/ui/sonner"
 import {
   CLERK_SIGN_IN_PATH,
@@ -39,9 +40,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
         data-scroll-behavior="smooth"
         className={`${geistSans.variable} ${geistMono.variable} scroll-smooth dark`}
       >
-        <body>
+        <body className="flex min-h-dvh flex-col">
           <DevWarningFilter />
-          {children}
+          <div className="flex flex-1 flex-col">{children}</div>
+          <SiteFooter />
           <Toaster richColors theme="dark" />
         </body>
       </html>
